@@ -1,6 +1,8 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "intellmeet-frontend",
   "private": true,
+  "version": "1.0.0",
+  "description": "IntellMeet - Frontend Application",
   "sideEffects": false,
   "type": "module",
   "scripts": {
@@ -64,6 +66,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
+    "zustand": "^4.4.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
