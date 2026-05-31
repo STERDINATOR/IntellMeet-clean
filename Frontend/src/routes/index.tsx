@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, Play, CheckCircle2, Users, Calendar, TrendingUp, ShieldCheck, ChevronDown, Sparkles, Sun, Moon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUIStore } from "@/lib/stores";
-import heroImg from "@/assets/hero-ai.jpg";
+import heroImg from "@/assets/auth-portal.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
