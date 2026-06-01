@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useAuthStore, useUIStore } from "@/lib/stores";
 import { toast } from "sonner";
 import portalImg from "@/assets/auth-portal.jpg";
+import { apiClient, API_BASE_URL } from "@/lib/api/client";
+import { connectRealtime } from "@/lib/realtime";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Create your IntellMeet workspace" }, { name: "description", content: "Start collaborating with AI-powered meetings in seconds." }] }),
@@ -41,20 +43,40 @@ function ThemeToggle() {
 
 function Signup() {
   const [loading, setLoading] = useState(false);
-  const login = useAuthStore((s) => s.login);
+  const setSession = useAuthStore((s) => s.setSession);
   const navigate = useNavigate();
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { login(); toast.success("Workspace created"); navigate({ to: "/app/dashboard" }); }, 800);
+    const form = new FormData(e.currentTarget);
+    const name = `${form.get("firstName")} ${form.get("lastName")}`.trim();
+    try {
+      const session = await apiClient.post<{ user: any; accessToken: string; refreshToken: string }>("/auth/signup", {
+        name,
+        email: String(form.get("email")),
+        workspaceName: String(form.get("workspaceName")),
+        password: String(form.get("password")),
+      });
+      setSession(session);
+      connectRealtime();
+      toast.success("Workspace created successfully");
+      navigate({ to: "/app/dashboard" });
+    } catch (error) {
+      toast.error("Unable to create workspace. Please try again.");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const social = (provider: string) => { login(); toast.success(`Signed up with ${provider}`); navigate({ to: "/app/dashboard" }); };
+  const social = (provider: string) => {
+    window.location.href = `${API_BASE_URL}/auth/oauth/${provider.toLowerCase()}`;
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "var(--gradient-mesh)" }} />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-mesh" />
       <div className="absolute top-6 right-6 z-50"><ThemeToggle /></div>
 
       <div className="relative max-w-[1400px] mx-auto px-6 lg:px-10 py-8">
@@ -138,33 +160,33 @@ function Signup() {
                     <label className="text-sm font-medium">First name</label>
                     <div className="relative">
                       <User className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input defaultValue="Alex" required className="h-12 pl-10 rounded-xl bg-input/50" />
+                      <Input name="firstName" defaultValue="Alex" required className="h-12 pl-10 rounded-xl bg-input/50" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Last name</label>
-                    <Input defaultValue="Morgan" required className="h-12 rounded-xl bg-input/50" />
+                    <Input name="lastName" defaultValue="Morgan" required className="h-12 rounded-xl bg-input/50" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Work email</label>
                   <div className="relative">
                     <Mail className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="email" defaultValue="alex@intellmeet.io" required className="h-12 pl-10 rounded-xl bg-input/50" />
+                    <Input name="email" type="email" defaultValue="alex@intellmeet.io" required className="h-12 pl-10 rounded-xl bg-input/50" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Workspace name</label>
                   <div className="relative">
                     <Briefcase className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input defaultValue="IntellMeet HQ" required className="h-12 pl-10 rounded-xl bg-input/50" />
+                    <Input name="workspaceName" defaultValue="IntellMeet HQ" required className="h-12 pl-10 rounded-xl bg-input/50" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Password</label>
                   <div className="relative">
                     <Lock className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="password" defaultValue="password123" required className="h-12 pl-10 rounded-xl bg-input/50" />
+                    <Input name="password" type="password" defaultValue="password123" required className="h-12 pl-10 rounded-xl bg-input/50" />
                   </div>
                 </div>
 

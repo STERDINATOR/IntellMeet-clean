@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMeetingsStore } from "@/lib/stores";
+import { meetingService } from "@/lib/api/services";
 import { users } from "@/lib/mock";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,7 +15,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 export const Route = createFileRoute("/app/meetings/new")({ component: NewMeeting });
 
 function NewMeeting() {
-  const add = useMeetingsStore((s) => s.add);
   const navigate = useNavigate();
   const [selected, setSelected] = useState<string[]>(["u1","u2"]);
   const [type, setType] = useState("Team");
@@ -24,10 +23,10 @@ function NewMeeting() {
     <div className="max-w-3xl">
       <PageHeader title="Schedule a meeting" subtitle="Set up your next meeting with AI-powered agenda assist." />
       <Card className="p-6 bg-card/60 border-border/60">
-        <form onSubmit={(e) => {
+        <form onSubmit={async (e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
-          const id = add({
+          const created = await meetingService.create({
             title: String(f.get("title")),
             start: new Date(String(f.get("date")) + "T" + String(f.get("time"))).toISOString(),
             duration: Number(f.get("duration")),
@@ -37,6 +36,7 @@ function NewMeeting() {
             type: type as any,
             agenda: String(f.get("agenda")),
           });
+          const id = typeof created === "string" ? created : created.id;
           toast.success("Meeting scheduled");
           navigate({ to: "/app/meetings/$id", params: { id } });
         }} className="space-y-5">

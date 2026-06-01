@@ -6,13 +6,14 @@ import { analytics } from "@/lib/mock";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, LineChart, Line, RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
 import { Download, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { csv, downloadText } from "@/lib/workflows";
 
 export const Route = createFileRoute("/app/analytics")({ component: Analytics });
 
 function Analytics() {
   return (
     <div>
-      <PageHeader title="Analytics" subtitle="Meeting trends, productivity, and effectiveness." actions={<Button variant="outline" onClick={()=>toast.success("Report exported")}><Download className="h-4 w-4 mr-2" />Export Report</Button>} />
+      <PageHeader title="Analytics" subtitle="Meeting trends, productivity, and effectiveness." actions={<Button variant="outline" onClick={() => { downloadText("intellmeet-analytics.csv", csv(analytics.meetingTrends), "text/csv;charset=utf-8"); toast.success("Analytics CSV downloaded"); }}><Download className="h-4 w-4 mr-2" />Export Report</Button>} />
 
       <div className="grid lg:grid-cols-3 gap-4">
         <Card className="p-6 bg-card/60 border-border/60 lg:col-span-2">
@@ -75,7 +76,7 @@ function Analytics() {
         </Card>
 
         <Card className="lg:col-span-3 p-6 bg-card/60 border-border/60 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20" style={{background:"var(--gradient-glow)"}} />
+          <div className="absolute inset-0 opacity-20 bg-gradient-glow" />
           <div className="relative">
             <div className="flex items-center gap-2 mb-3"><Sparkles className="h-4 w-4 text-primary" /><div className="font-semibold">AI recommendations</div></div>
             <div className="grid md:grid-cols-3 gap-3">

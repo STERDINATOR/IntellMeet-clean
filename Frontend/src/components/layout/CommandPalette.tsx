@@ -1,8 +1,28 @@
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useUIStore } from "@/lib/stores";
-import { LayoutDashboard, Video, ListTodo, FolderKanban, BarChart3, Users, Bell, Settings, Sparkles, Plus, FileText, User } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  FolderKanban,
+  LayoutDashboard,
+  ListTodo,
+  Plus,
+  Settings,
+  Sparkles,
+  User,
+  Users,
+  Video,
+  FileText,
+} from "lucide-react";
 
 export function CommandPalette() {
   const { commandOpen, setCommandOpen } = useUIStore();
@@ -19,7 +39,10 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, [commandOpen, setCommandOpen]);
 
-  const go = (to: string) => { setCommandOpen(false); navigate({ to }); };
+  const go = (to: string) => {
+    setCommandOpen(false);
+    navigate({ to });
+  };
 
   const items = [
     { label: "Dashboard", icon: LayoutDashboard, to: "/app/dashboard" },

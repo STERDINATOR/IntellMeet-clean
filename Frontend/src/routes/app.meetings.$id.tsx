@@ -6,10 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMeetingsStore } from "@/lib/stores";
+import { meetingService } from "@/lib/api/services";
 import { findUser, transcriptSample } from "@/lib/mock";
 import { format } from "date-fns";
-import { Download, Share2, Sparkles, CheckCircle2, AlertTriangle, FileText, Video } from "lucide-react";
+import { Download, Share2, Sparkles, CheckCircle2, FileText, Video } from "lucide-react";
 import { toast } from "sonner";
+import { buildMeetingLink, copyText, downloadText, meetingExport } from "@/lib/workflows";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/app/meetings/$id")({ component: MeetingDetail });
 
@@ -17,18 +20,29 @@ function MeetingDetail() {
   const { id } = Route.useParams();
   const meeting = useMeetingsStore((s) => s.meetings.find(m => m.id === id));
   const navigate = useNavigate();
-  if (!meeting) return <div className="text-muted-foreground">Meeting not found.</div>;
+  const [remoteMeeting, setRemoteMeeting] = useState<typeof meeting | null>(null);
+
+  useEffect(() => {
+    if (!meeting) {
+      meetingService.get(id).then((remote) => {
+        if (remote) setRemoteMeeting(remote as any);
+      }).catch(() => toast.error("Unable to load meeting details."));
+    }
+  }, [id, meeting]);
+
+  const currentMeeting = meeting ?? remoteMeeting;
+  if (!currentMeeting) return <div className="text-muted-foreground">Meeting not found.</div>;
 
   return (
     <div>
       <PageHeader
-        title={meeting.title}
-        subtitle={`${format(new Date(meeting.start), "EEEE, MMM d • HH:mm")} • ${meeting.duration} min`}
+        title={currentMeeting.title}
+        subtitle={`${format(new Date(currentMeeting.start), "EEEE, MMM d • HH:mm")} • ${currentMeeting.duration} min`}
         actions={
           <>
-            <Button variant="outline" onClick={() => toast.success("Shared link copied")}><Share2 className="h-4 w-4 mr-2" />Share</Button>
-            <Button variant="outline" onClick={() => toast.success("PDF export started")}><Download className="h-4 w-4 mr-2" />Export PDF</Button>
-            {meeting.status !== "ended" && <Button className="gradient-primary text-primary-foreground border-0" onClick={() => navigate({ to: "/app/room/$id", params: { id } })}><Video className="h-4 w-4 mr-2" />Join</Button>}
+            <Button variant="outline" onClick={async () => { await copyText(buildMeetingLink(currentMeeting.id)); toast.success("Meeting link copied"); }}><Share2 className="h-4 w-4 mr-2" />Share</Button>
+            <Button variant="outline" onClick={() => { downloadText(`${currentMeeting.title.toLowerCase().replace(/\W+/g, "-")}-summary.md`, meetingExport(currentMeeting), "text/markdown;charset=utf-8"); toast.success("Summary downloaded"); }}><Download className="h-4 w-4 mr-2" />Export PDF</Button>
+            {currentMeeting.status !== "ended" && <Button className="gradient-primary text-primary-foreground border-0" onClick={() => navigate({ to: "/app/room/$id", params: { id } })}><Video className="h-4 w-4 mr-2" />Join</Button>}
           </>
         }
       />
@@ -91,7 +105,7 @@ function MeetingDetail() {
           <Card className="p-6 bg-card/60 border-border/60">
             <div className="font-semibold mb-3">Participants</div>
             <div className="space-y-2">
-              {meeting.participants.map(id => {
+              {currentMeeting.participants.map(id => {
                 const u = findUser(id);
                 return <div key={id} className="flex items-center gap-3"><Avatar className="h-8 w-8"><AvatarImage src={u.avatar} /><AvatarFallback>{u.name[0]}</AvatarFallback></Avatar><div className="text-sm"><div className="font-medium">{u.name}</div><div className="text-xs text-muted-foreground">{u.role}</div></div></div>;
               })}
@@ -100,7 +114,7 @@ function MeetingDetail() {
           <Card className="p-6 bg-card/60 border-border/60">
             <div className="font-semibold mb-3">Metrics</div>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Score</span><span className="font-semibold">{meeting.score || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Score</span><span className="font-semibold">{currentMeeting.score || "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Sentiment</span><span className="font-semibold text-success">Positive</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Talk balance</span><span>74%</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recordings</span><span>1 file</span></div>

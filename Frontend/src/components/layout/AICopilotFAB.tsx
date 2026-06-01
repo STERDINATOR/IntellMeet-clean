@@ -3,6 +3,7 @@ import { Sparkles, X, Send, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "@/lib/stores";
+import { streamAI } from "@/lib/ai-stream";
 
 const quick = [
   "Summarize my last meeting",
@@ -11,13 +12,13 @@ const quick = [
   "Create a project plan for launch",
 ];
 
-const fakeReply = (q: string) =>
-  `Here's what I found for "${q}":\n\n• Pulled context from your last 5 meetings and 12 docs\n• Identified 3 action items and 2 risks\n• Suggested 4 follow-ups assigned to relevant owners\n\nWant me to create the tasks now?`;
+const fallbackReply = (q: string) =>
+  `Here's what I found for "${q}":\n\n- Pulled context from your workspace\n- Identified action items and risks\n- Suggested follow-ups assigned to relevant owners\n\nConnect MongoDB backend + OpenAI key for live streaming.`;
 
 export function AICopilotFAB() {
   const { copilotOpen, setCopilotOpen } = useUIStore();
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>([
-    { role: "ai", text: "Hi Alex — I'm your IntellMeet Copilot. Ask me anything about your workspace." },
+    { role: "ai", text: "Hi Alex, I'm your IntellMeet Copilot. Ask me anything about your workspace." },
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
@@ -25,15 +26,23 @@ export function AICopilotFAB() {
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: 99999, behavior: "smooth" }); }, [messages, typing]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     if (!text.trim()) return;
-    setMessages((m) => [...m, { role: "user", text }]);
+    const aiIndex = messages.length + 1;
+    setMessages((m) => [...m, { role: "user", text }, { role: "ai", text: "" }]);
     setInput("");
     setTyping(true);
-    setTimeout(() => {
-      setMessages((m) => [...m, { role: "ai", text: fakeReply(text) }]);
+    try {
+      await streamAI({
+        path: "/ai/copilot/stream",
+        body: { prompt: text },
+        onDelta: (delta) => setMessages((m) => m.map((item, index) => index === aiIndex ? { ...item, text: item.text + delta } : item)),
+      });
+    } catch {
+      setMessages((m) => m.map((item, index) => index === aiIndex ? { ...item, text: fallbackReply(text) } : item));
+    } finally {
       setTyping(false);
-    }, 900);
+    }
   };
 
   return (
@@ -68,15 +77,15 @@ export function AICopilotFAB() {
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
                   <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
-                    {m.text}
+                    {m.text || (typing && i === messages.length - 1 ? "Thinking..." : "")}
                   </div>
                 </div>
               ))}
               {typing && (
                 <div className="flex"><div className="bg-secondary rounded-2xl px-3 py-2 text-sm flex gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{animationDelay: "0.1s"}} />
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{animationDelay: "0.2s"}} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce delay-100" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce delay-200" />
                 </div></div>
               )}
             </div>
@@ -93,7 +102,7 @@ export function AICopilotFAB() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask Copilot anything…"
+                placeholder="Ask Copilot anything..."
                 className="flex-1 bg-secondary/60 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-primary/40"
               />
               <Button size="icon" type="submit" className="gradient-primary text-primary-foreground border-0">

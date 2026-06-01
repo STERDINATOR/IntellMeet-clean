@@ -6,15 +6,26 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore, useNotificationsStore, useUIStore } from "@/lib/stores";
-import { currentUser } from "@/lib/mock";
+import { apiClient } from "@/lib/api/client";
 import { formatDistanceToNow } from "date-fns";
 
 export function Topbar() {
   const { theme, setTheme, setCommandOpen } = useUIStore();
   const { items, markAllRead, markRead } = useNotificationsStore();
-  const unread = items.filter((n) => !n.read).length;
+  const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const unread = items.filter((n) => !n.read).length;
   const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.post("/auth/logout");
+    } catch {
+      // swallow logout errors and clear local session anyway
+    }
+    logout();
+    navigate({ to: "/login" });
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 bg-background/60 px-4 md:px-6 backdrop-blur-xl">
@@ -69,19 +80,22 @@ export function Topbar() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="rounded-full ring-2 ring-transparent hover:ring-primary/40 transition">
-            <Avatar className="h-9 w-9"><AvatarImage src={currentUser.avatar} /><AvatarFallback>AM</AvatarFallback></Avatar>
+            <Avatar className="h-9 w-9">
+              <AvatarImage src={user.avatar} />
+              <AvatarFallback>{user.name?.slice(0, 2) ?? "ME"}</AvatarFallback>
+            </Avatar>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
-            <div className="font-medium">{currentUser.name}</div>
-            <div className="text-xs text-muted-foreground">{currentUser.email}</div>
+            <div className="font-medium">{user.name}</div>
+            <div className="text-xs text-muted-foreground">{user.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => navigate({ to: "/app/profile" })}>Profile</DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate({ to: "/app/settings" })}>Settings</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => { logout(); navigate({ to: "/" }); }}>
+          <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" /> Log out
           </DropdownMenuItem>
         </DropdownMenuContent>

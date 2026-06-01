@@ -7,23 +7,35 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Sparkles } from "lucide-react";
-import { useTasksStore } from "@/lib/stores";
-import { findUser } from "@/lib/mock";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, Plus, Sparkles, Trash2 } from "lucide-react";
+import { useProjectsStore, useTasksStore } from "@/lib/stores";
+import { taskService, projectService } from "@/lib/api/services";
+import { findUser, users } from "@/lib/mock";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Task } from "@/lib/mock";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/tasks")({ component: Tasks });
 
 function Tasks() {
-  const { tasks, setStatus, update } = useTasksStore();
+  const { tasks, setStatus } = useTasksStore();
+  const projects = useProjectsStore((s) => s.projects);
   const [q, setQ] = useState("");
   const [pri, setPri] = useState<string>("all");
   const [status, setStat] = useState<string>("all");
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<Task | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    taskService.list().catch(() => toast.error("Unable to load tasks."));
+    projectService.list().catch(() => toast.error("Unable to load projects."));
+  }, []);
+
   const filtered = tasks.filter(t => t.title.toLowerCase().includes(q.toLowerCase()) && (pri === "all" || t.priority === pri) && (status === "all" || t.status === status));
   const perPage = 10;
   const paged = filtered.slice(page*perPage, page*perPage+perPage);
@@ -31,7 +43,7 @@ function Tasks() {
 
   return (
     <div>
-      <PageHeader title="Tasks" subtitle="Track work across projects with AI importance scoring." actions={<Button className="gradient-primary text-primary-foreground border-0" onClick={() => toast.success("Task created")}><Plus className="h-4 w-4 mr-2" />New Task</Button>} />
+      <PageHeader title="Tasks" subtitle="Track work across projects with AI importance scoring." actions={<Button className="gradient-primary text-primary-foreground border-0" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" />New Task</Button>} />
 
       <Card className="p-4 bg-card/60 border-border/60 mb-4">
         <div className="flex flex-wrap gap-3">
@@ -82,12 +94,15 @@ function Tasks() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">Status</div>
-                  <Select value={open.status} onValueChange={(v) => { setStatus(open.id, v as Task["status"]); setOpen({ ...open, status: v as Task["status"] }); toast.success("Status updated"); }}>
+                  <Select value={open.status} onValueChange={async (v) => { await taskService.update(open.id, { status: v as Task["status"] }); setStatus(open.id, v as Task["status"]); setOpen({ ...open, status: v as Task["status"] }); toast.success("Status updated"); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{["todo","in_progress","review","done"].map(p=><SelectItem key={p} value={p}>{p.replace("_"," ")}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="flex flex-wrap gap-1">{open.tags.map(t => <Badge key={t} variant="outline">#{t}</Badge>)}</div>
+                <Button variant="destructive" onClick={async () => { await taskService.remove(open.id); toast.success("Task deleted"); setOpen(null); }}>
+                  <Trash2 className="h-4 w-4 mr-2" />Delete task
+                </Button>
                 <div className="border-t border-border pt-3">
                   <div className="text-xs text-muted-foreground mb-2">Comments</div>
                   <div className="rounded-lg bg-secondary/40 p-3 text-sm">"Looks good — let's ship it this week." — Noah</div>
@@ -97,6 +112,46 @@ function Tasks() {
           ); })()}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create task</DialogTitle></DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            const created = await taskService.create({
+              title: String(f.get("title")),
+              description: String(f.get("description")),
+              status: String(f.get("status")) as Task["status"],
+              priority: String(f.get("priority")) as Task["priority"],
+              assignee: String(f.get("assignee")),
+              due: new Date(String(f.get("due"))).toISOString(),
+              project: String(f.get("project")),
+              aiScore: Number(f.get("aiScore")),
+              tags: String(f.get("tags")).split(",").map((t) => t.trim()).filter(Boolean),
+            });
+            toast.success("Task created");
+            setCreateOpen(false);
+            setOpen(created as Task);
+          }} className="space-y-4">
+            <div className="space-y-1.5"><Label>Title</Label><Input name="title" required defaultValue="Follow up from Q4 strategy" /></div>
+            <div className="space-y-1.5"><Label>Description</Label><Textarea name="description" required defaultValue="Capture decisions, owners, and acceptance criteria." /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Priority</Label><Select name="priority" defaultValue="high"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["low","medium","high","urgent"].map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>Status</Label><Select name="status" defaultValue="todo"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["todo","in_progress","review","done"].map(p=><SelectItem key={p} value={p}>{p.replace("_"," ")}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>Assignee</Label><Select name="assignee" defaultValue="u2"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{users.map(u=><SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>Project</Label><Select name="project" defaultValue={projects[0]?.id}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{projects.map(p=><SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>Due</Label><Input name="due" type="date" required defaultValue={new Date(Date.now()+86400000*3).toISOString().slice(0,10)} /></div>
+              <div className="space-y-1.5"><Label>AI score</Label><Input name="aiScore" type="number" min="0" max="100" required defaultValue={86} /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Tags</Label><Input name="tags" defaultValue="meeting, follow-up, ai" /></div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button type="submit" className="gradient-primary text-primary-foreground border-0">Create task</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

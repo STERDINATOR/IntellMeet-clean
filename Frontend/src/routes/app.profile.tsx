@@ -24,7 +24,7 @@ function Profile() {
     <div>
       <PageHeader title="Profile" />
       <Card className="overflow-hidden bg-card/60 border-border/60">
-        <div className="h-40 relative" style={{ background: "var(--gradient-primary)" }}>
+        <div className="h-40 relative gradient-primary">
           <div className="absolute inset-0 grid-bg opacity-30" />
         </div>
         <div className="px-6 pb-6 -mt-12">

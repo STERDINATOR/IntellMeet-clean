@@ -1,0 +1,30 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: intellmeet-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - intellmeet_mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./Backend
+    container_name: intellmeet-backend
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      PORT: 4000
+      CLIENT_URL: http://127.0.0.1:5173
+      MONGODB_URI: mongodb://mongodb:27017/intellmeet
+      JWT_ACCESS_SECRET: change-me-access-secret
+      JWT_REFRESH_SECRET: change-me-refresh-secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: gpt-4o-mini
+    ports:
+      - "4000:4000"
+
+volumes:
+  intellmeet_mongo_data:

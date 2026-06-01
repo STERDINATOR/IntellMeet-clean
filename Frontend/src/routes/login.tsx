@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Brain, Zap, BarChart3, Mail, Lock, Eye, EyeOff, Star, Info, ShieldCheck, Loader2, Sun, Moon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore, useUIStore } from "@/lib/stores";
 import { toast } from "sonner";
 import portalImg from "@/assets/auth-portal.jpg";
+import { apiClient, API_BASE_URL } from "@/lib/api/client";
+import { connectRealtime } from "@/lib/realtime";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in to IntellMeet" }, { name: "description", content: "Access your AI-powered collaboration workspace." }] }),
@@ -43,20 +45,73 @@ function ThemeToggle() {
 function Login() {
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
-  const login = useAuthStore((s) => s.login);
+  const setSession = useAuthStore((s) => s.setSession);
   const navigate = useNavigate();
 
-  const submit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthSuccess = params.get("oauthSuccess");
+    const accessToken = params.get("accessToken");
+    const refreshToken = params.get("refreshToken");
+    const oauthError = params.get("oauthError");
+
+    if (oauthError) {
+      toast.error(`OAuth failed: ${oauthError}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (oauthSuccess && accessToken && refreshToken) {
+      const restoreSession = async () => {
+        setSession({ accessToken, refreshToken });
+        connectRealtime();
+
+        try {
+          const response = await apiClient.get<{ user: any }>("/auth/me");
+          if (response?.user) {
+            setSession({ user: response.user, accessToken, refreshToken });
+          }
+        } catch (error) {
+          console.error("Failed to load user after OAuth login", error);
+        }
+
+        toast.success("Signed in successfully");
+        window.history.replaceState({}, document.title, window.location.pathname);
+        navigate({ to: "/app/dashboard" });
+      };
+
+      void restoreSession();
+    }
+  }, [navigate, setSession]);
+
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { login(); toast.success("Welcome back, Alex"); navigate({ to: "/app/dashboard" }); }, 700);
+    const form = new FormData(e.currentTarget);
+    try {
+      const session = await apiClient.post<{ user: any; accessToken: string; refreshToken: string }>("/auth/login", {
+        email: String(form.get("email")),
+        password: String(form.get("password")),
+      });
+      setSession(session);
+      connectRealtime();
+      toast.success(`Welcome back, ${session.user?.name ?? "Alex"}`);
+      navigate({ to: "/app/dashboard" });
+    } catch (error) {
+      toast.error("Unable to log in. Please check your credentials and try again.");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const social = (provider: string) => { login(); toast.success(`Signed in with ${provider}`); navigate({ to: "/app/dashboard" }); };
+  const social = (provider: string) => {
+    window.location.href = `${API_BASE_URL}/auth/oauth/${provider.toLowerCase()}`;
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "var(--gradient-mesh)" }} />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-mesh" />
       <div className="absolute top-6 right-6 z-50"><ThemeToggle /></div>
 
       <div className="relative max-w-[1400px] mx-auto px-6 lg:px-10 py-8">
@@ -145,7 +200,7 @@ function Login() {
                   <label className="text-sm font-medium">Email address</label>
                   <div className="relative">
                     <Mail className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="email" placeholder="you@example.com" defaultValue="alex@intellmeet.io" required className="h-12 pl-10 rounded-xl bg-input/50" />
+                    <Input name="email" type="email" placeholder="you@example.com" defaultValue="alex@intellmeet.io" required className="h-12 pl-10 rounded-xl bg-input/50" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -155,7 +210,7 @@ function Login() {
                   </div>
                   <div className="relative">
                     <Lock className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input type={showPw ? "text" : "password"} placeholder="Enter your password" defaultValue="password123" required className="h-12 pl-10 pr-10 rounded-xl bg-input/50" />
+                    <Input name="password" type={showPw ? "text" : "password"} placeholder="Enter your password" defaultValue="password123" required className="h-12 pl-10 pr-10 rounded-xl bg-input/50" />
                     <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                       {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>

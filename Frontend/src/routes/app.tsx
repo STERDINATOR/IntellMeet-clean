@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/layout/CommandPalette";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { useAuthStore, useUIStore } from "@/lib/stores";
+import { apiClient, tokenManager } from "@/lib/api/client";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
@@ -20,10 +21,34 @@ export const Route = createFileRoute("/app")({
 
 function AppLayout() {
   const theme = useUIStore((s) => s.theme);
+  const isAuthed = useAuthStore((s) => s.isAuthed);
+  const setSession = useAuthStore((s) => s.setSession);
+
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  useEffect(() => {
+    if (!isAuthed) return;
+
+    const loadMe = async () => {
+      try {
+        const response = await apiClient.get<{ user: any }>("/auth/me");
+        if (response?.user) {
+          setSession({
+            user: response.user,
+            accessToken: tokenManager.getAccessToken() ?? "",
+            refreshToken: tokenManager.getRefreshToken() ?? "",
+          });
+        }
+      } catch {
+        // preserve existing session if refresh fails elsewhere
+      }
+    };
+
+    loadMe();
+  }, [isAuthed, setSession]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

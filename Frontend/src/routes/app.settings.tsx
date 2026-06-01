@@ -11,11 +11,15 @@ import { useUIStore } from "@/lib/stores";
 import { currentUser } from "@/lib/mock";
 import { toast } from "sonner";
 import { Moon, Sun, Monitor } from "lucide-react";
+import { useRef, useState } from "react";
 
 export const Route = createFileRoute("/app/settings")({ component: Settings });
 
 function Settings() {
   const { theme, setTheme } = useUIStore();
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const [connected, setConnected] = useState<string[]>([]);
+  const [sessionActive, setSessionActive] = useState(true);
   return (
     <div>
       <PageHeader title="Settings" subtitle="Manage your workspace, profile, and integrations." />
@@ -26,7 +30,11 @@ function Settings() {
 
         <TabsContent value="profile" className="mt-4">
           <Card className="p-6 bg-card/60 border-border/60 max-w-2xl">
-            <div className="flex items-center gap-4 mb-6"><Avatar className="h-16 w-16"><AvatarImage src={currentUser.avatar} /><AvatarFallback>AM</AvatarFallback></Avatar><Button variant="outline" size="sm">Change avatar</Button></div>
+            <div className="flex items-center gap-4 mb-6">
+              <Avatar className="h-16 w-16"><AvatarImage src={currentUser.avatar} /><AvatarFallback>AM</AvatarFallback></Avatar>
+              <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={(e) => e.currentTarget.files?.[0] && toast.success(`Avatar selected: ${e.currentTarget.files[0].name}`)} />
+              <Button variant="outline" size="sm" onClick={() => avatarInput.current?.click()}>Change avatar</Button>
+            </div>
             <form onSubmit={(e)=>{e.preventDefault();toast.success("Profile saved");}} className="space-y-4">
               <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label>Name</Label><Input defaultValue={currentUser.name} /></div><div className="space-y-1.5"><Label>Email</Label><Input defaultValue={currentUser.email} /></div></div>
               <div className="space-y-1.5"><Label>Role</Label><Input defaultValue={currentUser.role} /></div>
@@ -72,7 +80,7 @@ function Settings() {
 
         <TabsContent value="accounts" className="mt-4">
           <Card className="p-6 bg-card/60 border-border/60 max-w-2xl space-y-3">
-            {["Google","Microsoft","Slack","Zoom","Notion"].map(n=><div key={n} className="flex items-center justify-between p-3 rounded-lg bg-secondary/40"><div className="text-sm font-medium">{n}</div><Button size="sm" variant="outline" onClick={()=>toast.success(`${n} connected`)}>Connect</Button></div>)}
+            {["Google","Microsoft","Slack","Zoom","Notion"].map(n=><div key={n} className="flex items-center justify-between p-3 rounded-lg bg-secondary/40"><div className="text-sm font-medium">{n}</div><Button size="sm" variant={connected.includes(n) ? "secondary" : "outline"} onClick={()=>{ setConnected((items) => items.includes(n) ? items.filter(x => x !== n) : [...items, n]); toast.success(connected.includes(n) ? `${n} disconnected` : `${n} connected`); }}>{connected.includes(n) ? "Disconnect" : "Connect"}</Button></div>)}
           </Card>
         </TabsContent>
       </Tabs>

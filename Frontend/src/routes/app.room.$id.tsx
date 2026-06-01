@@ -5,18 +5,23 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Mic, MicOff, Video, VideoOff, ScreenShare, Hand, Smile, Captions, Circle, PhoneOff, Sparkles, MessageSquare, Users, FileText } from "lucide-react";
 import { useMeetingsStore } from "@/lib/stores";
 import { findUser, transcriptSample, currentUser } from "@/lib/mock";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { meetingService, taskService } from "@/lib/api/services";
 import { motion } from "framer-motion";
+import { socketClient } from "@/lib/realtime";
+import { mediaDeviceManager, peerConnectionManager, useMeetingMediaStore } from "@/lib/meeting-media";
 
 export const Route = createFileRoute("/app/room/$id")({ component: Room });
 
 function Room() {
   const { id } = Route.useParams();
   const meeting = useMeetingsStore((s) => s.meetings.find(m => m.id === id));
+  const updateMeeting = useMeetingsStore((s) => s.update);
   const navigate = useNavigate();
-  const [mic, setMic] = useState(true);
+  const setMediaState = useMeetingMediaStore((s) => s.set);  const [remoteMeeting, setRemoteMeeting] = useState<any>(null);
+  const [loadingMeeting, setLoadingMeeting] = useState(false);  const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
   const [share, setShare] = useState(false);
   const [hand, setHand] = useState(false);
@@ -25,9 +30,73 @@ function Room() {
   const [chat, setChat] = useState<{ user: string; text: string }[]>([{ user: "Aria Chen", text: "Welcome team!" }]);
   const [input, setInput] = useState("");
 
-  const participants = meeting ? [currentUser, ...meeting.participants.filter(p => p !== "me").map(findUser)] : [currentUser];
+  const activeMeeting = meeting ?? remoteMeeting;
+  const participants = activeMeeting ? [currentUser, ...activeMeeting.participants.filter((p: string) => p !== "me").map(findUser)] : [currentUser];
 
-  const leave = () => { toast.success("You left the meeting"); navigate({ to: "/app/meetings" }); };
+  useEffect(() => {
+    if (!meeting) {
+      setLoadingMeeting(true);
+      meetingService.get(id)
+        .then((remote) => {
+          if (remote) setRemoteMeeting(remote as any);
+        })
+        .catch((error) => {
+          console.error(error);
+          toast.error("Unable to load meeting details.");
+        })
+        .finally(() => setLoadingMeeting(false));
+    }
+
+    socketClient.emit("meeting:join", { roomId: id });
+    const offChat = socketClient.on<{ userId?: string; text: string }>("chat:message", (message) => {
+      setChat((items) => [...items, { user: message.userId === "me" ? "You" : "Teammate", text: message.text }]);
+    });
+    const offOffer = socketClient.on<{ from: string; offer: RTCSessionDescriptionInit }>("webrtc:offer", ({ from, offer }) => {
+      const peer = peerConnectionManager.create(from);
+      peer.setRemoteDescription(offer).catch(() => undefined);
+    });
+    const offAnswer = socketClient.on<{ from: string; answer: RTCSessionDescriptionInit }>("webrtc:answer", ({ from, answer }) => {
+      peerConnectionManager.get(from)?.setRemoteDescription(answer).catch(() => undefined);
+    });
+    const offIce = socketClient.on<{ from: string; candidate: RTCIceCandidateInit }>("webrtc:ice-candidate", ({ from, candidate }) => {
+      peerConnectionManager.get(from)?.addIceCandidate(candidate).catch(() => undefined);
+    });
+    return () => {
+      socketClient.emit("meeting:leave", { roomId: id });
+      offChat();
+      offOffer();
+      offAnswer();
+      offIce();
+      peerConnectionManager.closeAll();
+    };
+  }, [id]);
+
+  const leave = async () => {
+    socketClient.emit("meeting:leave", { roomId: id });
+    await meetingService.update(id, { status: "ended", score: 91 });
+    updateMeeting(id, { status: "ended", score: 91 });
+    toast.success("Meeting ended and summary queued");
+    navigate({ to: "/app/meetings" });
+  };
+
+  const toggleScreenShare = async () => {
+    if (share) {
+      setShare(false);
+      setMediaState({ screenSharing: false });
+      socketClient.emit("meeting:control", { roomId: id, control: "screenSharing", value: false });
+      toast.success("Stopped sharing");
+      return;
+    }
+    try {
+      await mediaDeviceManager.getDisplayMedia();
+      setShare(true);
+      setMediaState({ screenSharing: true });
+      socketClient.emit("meeting:control", { roomId: id, control: "screenSharing", value: true });
+      toast.success("Started sharing");
+    } catch {
+      toast.error("Screen sharing permission was not granted");
+    }
+  };
 
   return (
     <div className="-m-4 md:-m-8 h-[calc(100vh-4rem)] flex flex-col bg-background">
@@ -44,7 +113,7 @@ function Room() {
           <div className={`grid gap-3 h-full ${participants.length <= 2 ? "grid-cols-1 md:grid-cols-2" : participants.length <= 4 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
             {participants.map((p, i) => (
               <motion.div key={p.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-secondary to-card border border-border min-h-[180px] flex items-center justify-center group">
-                <div className="absolute inset-0 opacity-30" style={{ background: "var(--gradient-glow)" }} />
+                <div className="absolute inset-0 opacity-30 bg-gradient-glow" />
                 {p.id === "me" && !cam ? (
                   <Avatar className="h-24 w-24 ring-4 ring-primary/30"><AvatarImage src={p.avatar} /><AvatarFallback>{p.name[0]}</AvatarFallback></Avatar>
                 ) : (
@@ -77,7 +146,7 @@ function Room() {
                   </div>
                 ))}
               </div>
-              <form onSubmit={(e) => { e.preventDefault(); if (!input.trim()) return; setChat(c => [...c, { user: "You", text: input }]); setInput(""); }} className="mt-2 flex gap-2">
+              <form onSubmit={(e) => { e.preventDefault(); if (!input.trim()) return; socketClient.emit("chat:message", { roomId: id, text: input }); setChat(c => [...c, { user: "You", text: input }]); setInput(""); }} className="mt-2 flex gap-2">
                 <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Message…" className="flex-1 bg-secondary/60 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 ring-primary/40" />
                 <Button type="submit" size="sm" className="gradient-primary text-primary-foreground border-0">Send</Button>
               </form>
@@ -97,23 +166,37 @@ function Room() {
                   <li>Risk: launch slipping by 1 week</li>
                 </ul>
               </div>
-              <Button className="w-full gradient-primary text-primary-foreground border-0" onClick={() => toast.success("Tasks generated from meeting")}>Generate tasks</Button>
+              <Button className="w-full gradient-primary text-primary-foreground border-0" onClick={async () => {
+                const tasks = ["Ship WebRTC plan", "Finalize AI eval dashboard", "Confirm launch risks"].map((title, index) => taskService.create({
+                  title,
+                  description: `Generated from ${meeting?.title ?? "live meeting"} transcript and AI insights.`,
+                  status: "todo",
+                  priority: index === 0 ? "urgent" : "high",
+                  assignee: ["u2","u5","u1"][index],
+                  due: new Date(Date.now()+86400000*(index+1)).toISOString(),
+                  project: "p1",
+                  aiScore: 90 - index,
+                  tags: ["meeting","ai"],
+                }));
+                await Promise.all(tasks);
+                toast.success("3 tasks generated from meeting");
+              }}>Generate tasks</Button>
             </TabsContent>
           </Tabs>
         </div>
       </div>
 
       <div className="flex items-center justify-center gap-2 p-4 border-t border-border bg-card/60 backdrop-blur">
-        <Ctl active={mic} onClick={() => setMic(!mic)} on={Mic} off={MicOff} label="Mic" />
-        <Ctl active={cam} onClick={() => setCam(!cam)} on={Video} off={VideoOff} label="Camera" />
-        <Ctl active={share} onClick={() => { setShare(!share); toast.success(share ? "Stopped sharing" : "Started sharing"); }} on={ScreenShare} off={ScreenShare} label="Share" />
+        <Ctl active={mic} onClick={() => { const next = !mic; setMic(next); setMediaState({ mic: next }); socketClient.emit("meeting:control", { roomId: id, control: "mic", value: next }); }} on={Mic} off={MicOff} label="Mic" />
+        <Ctl active={cam} onClick={() => { const next = !cam; setCam(next); setMediaState({ camera: next }); socketClient.emit("meeting:control", { roomId: id, control: "camera", value: next }); }} on={Video} off={VideoOff} label="Camera" />
+        <Ctl active={share} onClick={toggleScreenShare} on={ScreenShare} off={ScreenShare} label="Share" />
         <Ctl active={hand} onClick={() => { setHand(!hand); toast.success(hand ? "Hand lowered" : "Hand raised ✋"); }} on={Hand} off={Hand} label="Hand" />
         <Popover>
           <PopoverTrigger asChild><Button variant="secondary" size="icon" className="h-12 w-12 rounded-full"><Smile className="h-5 w-5" /></Button></PopoverTrigger>
           <PopoverContent className="w-auto p-2"><div className="flex gap-1">{["👍","❤️","😂","🎉","🔥","👏"].map(e => <button key={e} onClick={() => toast.success(`Reacted ${e}`)} className="text-2xl hover:scale-125 transition">{e}</button>)}</div></PopoverContent>
         </Popover>
-        <Ctl active={caps} onClick={() => setCaps(!caps)} on={Captions} off={Captions} label="Captions" />
-        <Ctl active={rec} danger onClick={() => { setRec(!rec); toast.success(rec ? "Recording stopped" : "Recording started"); }} on={Circle} off={Circle} label="Record" />
+        <Ctl active={caps} onClick={() => { const next = !caps; setCaps(next); setMediaState({ captions: next }); }} on={Captions} off={Captions} label="Captions" />
+        <Ctl active={rec} danger onClick={() => { const next = !rec; setRec(next); setMediaState({ recording: next }); socketClient.emit("meeting:control", { roomId: id, control: "recording", value: next }); toast.success(next ? "Recording started" : "Recording stopped"); }} on={Circle} off={Circle} label="Record" />
       </div>
     </div>
   );

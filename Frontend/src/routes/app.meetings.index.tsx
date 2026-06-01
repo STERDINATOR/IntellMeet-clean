@@ -8,23 +8,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calendar as CalendarIcon, Plus, Search, Video, Zap } from "lucide-react";
 import { useMeetingsStore } from "@/lib/stores";
+import { meetingService } from "@/lib/api/services";
 import { findUser } from "@/lib/mock";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/meetings/")({ component: Meetings });
 
 function Meetings() {
-  const { meetings, add } = useMeetingsStore();
+  const { meetings } = useMeetingsStore();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "upcoming" | "ended">("all");
   const list = meetings.filter(m => (filter === "all" || m.status === filter) && m.title.toLowerCase().includes(q.toLowerCase()));
 
-  const instant = () => {
-    const id = add({ title: "Instant Meeting", start: new Date().toISOString(), duration: 30, status: "live", participants: ["me"], host: "me", type: "Team" });
-    toast.success("Meeting started"); navigate({ to: "/app/room/$id", params: { id } });
+  useEffect(() => {
+    meetingService.list().catch(() => toast.error("Unable to load meetings."));
+  }, []);
+
+  const instant = async () => {
+    const result = await meetingService.create({ title: "Instant Meeting", start: new Date().toISOString(), duration: 30, status: "live", participants: ["me"], host: "me", type: "Team" });
+    const id = typeof result === "string" ? result : result.id;
+    toast.success("Meeting started");
+    navigate({ to: "/app/room/$id", params: { id } });
   };
 
   return (

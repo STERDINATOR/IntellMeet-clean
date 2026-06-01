@@ -5,6 +5,8 @@ import { ArrowRight, Play, CheckCircle2, Users, Calendar, TrendingUp, ShieldChec
 import { motion } from "framer-motion";
 import { useUIStore } from "@/lib/stores";
 import heroImg from "@/assets/auth-portal.jpg";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,9 +58,10 @@ function ThemeToggle() {
 }
 
 function Landing() {
+  const [demoOpen, setDemoOpen] = useState(false);
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "var(--gradient-mesh)" }} />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-mesh" />
       <div className="absolute inset-0 grid-bg opacity-[0.07] pointer-events-none" />
 
       {/* NAV */}
@@ -67,7 +70,7 @@ function Landing() {
           <Logo />
           <div className="hidden lg:flex items-center gap-8 text-sm">
             {navItems.map((n) => (
-              <button key={n.label} className="flex items-center gap-1 text-foreground/80 hover:text-foreground transition-colors">
+              <button key={n.label} onClick={() => setDemoOpen(true)} className="flex items-center gap-1 text-foreground/80 hover:text-foreground transition-colors">
                 {n.label}
                 {n.has && <ChevronDown className="h-3.5 w-3.5 opacity-60" />}
               </button>
@@ -107,7 +110,7 @@ function Landing() {
                   Start Free Trial <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="h-12 px-7 rounded-xl border-border/80 text-base">
+              <Button size="lg" variant="outline" onClick={() => setDemoOpen(true)} className="h-12 px-7 rounded-xl border-border/80 text-base">
                 <Play className="mr-1 h-4 w-4" /> Watch Demo
               </Button>
             </div>
@@ -120,7 +123,7 @@ function Landing() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.15 }} className="relative">
-            <div className="absolute inset-0 -m-10 blur-3xl opacity-70" style={{ background: "var(--gradient-glow)" }} />
+            <div className="absolute inset-0 -m-10 blur-3xl opacity-70 bg-gradient-glow" />
             <img src={heroImg} alt="IntellMeet AI workspace" width={1280} height={1024} className="relative rounded-3xl w-full" />
           </motion.div>
         </div>
@@ -162,6 +165,19 @@ function Landing() {
           <div className="flex gap-6"><a href="#" className="hover:text-foreground">Privacy</a><a href="#" className="hover:text-foreground">Terms</a><a href="#" className="hover:text-foreground">Security</a></div>
         </div>
       </footer>
+
+      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>IntellMeet demo</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="aspect-video rounded-xl bg-secondary/60 border border-border flex items-center justify-center">
+              <Play className="h-10 w-10 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground">Preview the end-to-end flow: schedule a meeting, join the live room, generate AI action items, and export reports.</p>
+            <Link to="/signup"><Button className="w-full gradient-primary text-primary-foreground border-0">Start free trial</Button></Link>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

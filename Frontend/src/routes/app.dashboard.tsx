@@ -7,10 +7,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Video, ListChecks, Clock, TrendingUp, Sparkles, Plus, ArrowRight, Calendar, Zap } from "lucide-react";
 import { useMeetingsStore, useTasksStore } from "@/lib/stores";
+import { meetingService, taskService } from "@/lib/api/services";
 import { aiInsights, recentActivity, findUser, analytics } from "@/lib/mock";
 import { format, formatDistanceToNow } from "date-fns";
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip, BarChart, Bar } from "recharts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,18 +20,23 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/app/dashboard")({ component: Dashboard });
 
 function Dashboard() {
-  const { meetings, add } = useMeetingsStore();
+  const { meetings } = useMeetingsStore();
   const tasks = useTasksStore((s) => s.tasks);
   const upcoming = meetings.filter((m) => m.status === "upcoming").slice(0, 4);
   const recent = meetings.filter((m) => m.status === "ended").slice(0, 3);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  const startInstant = (title: string) => {
-    const id = add({ title: title || "Instant Meeting", start: new Date().toISOString(), duration: 30, status: "live", participants: ["me"], host: "me", type: "Team" });
+  useEffect(() => {
+    meetingService.list().catch(() => undefined);
+    taskService.list().catch(() => undefined);
+  }, []);
+
+  const startInstant = async (title: string) => {
+    const created = await meetingService.create({ title: title || "Instant Meeting", start: new Date().toISOString(), duration: 30, status: "live", participants: ["me"], host: "me", type: "Team" });
     toast.success("Meeting started");
     setOpen(false);
-    navigate({ to: "/app/room/$id", params: { id } });
+    navigate({ to: "/app/room/$id", params: { id: created.id } });
   };
 
   return (
@@ -85,7 +91,7 @@ function Dashboard() {
         </Card>
 
         <Card className="p-6 bg-card/60 border-border/60 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-30" style={{ background: "var(--gradient-glow)" }} />
+          <div className="absolute inset-0 opacity-30 bg-gradient-glow" />
           <div className="relative">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-primary" />
