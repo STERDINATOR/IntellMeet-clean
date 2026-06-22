@@ -33,22 +33,38 @@ function Forgot() {
       <div className="absolute inset-0 bg-gradient-glow" />
       <Card className="relative w-full max-w-md p-8 glass elevated">
         <Link to="/" className="flex items-center gap-2 mb-8">
-          <div className="h-9 w-9 rounded-xl gradient-primary glow flex items-center justify-center"><MessageSquare className="h-5 w-5 text-primary-foreground" /></div>
+          <div className="h-9 w-9 rounded-xl gradient-primary glow flex items-center justify-center">
+            <MessageSquare className="h-5 w-5 text-primary-foreground" />
+          </div>
           <span className="font-bold">IntellMeet</span>
         </Link>
         <h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
-        <p className="text-sm text-muted-foreground mt-1">We'll send a reset link to your inbox.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          We'll send a reset link to your inbox.
+        </p>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div className="space-y-1.5">
             <Label>Email</Label>
-            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <Input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </div>
-          <Button type="submit" disabled={loading} className="w-full gradient-primary text-primary-foreground border-0 glow">
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full gradient-primary text-primary-foreground border-0 glow"
+          >
             {loading ? "Sending…" : "Send reset link"}
           </Button>
         </form>
         <p className="text-sm text-center text-muted-foreground mt-6">
-          Remembered it? <Link to="/login" className="text-primary hover:underline">Sign in</Link>
+          Remembered it?{" "}
+          <Link to="/login" className="text-primary hover:underline">
+            Sign in
+          </Link>
         </p>
       </Card>
     </div>

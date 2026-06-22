@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { useAuthStore, useUIStore } from "@/lib/stores";
 import { apiClient, tokenManager } from "@/lib/api/client";
+import { connectRealtime, startGlobalRealtimeSync } from "@/lib/realtime";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
@@ -48,6 +49,8 @@ function AppLayout() {
     };
 
     loadMe();
+    connectRealtime();
+    startGlobalRealtimeSync();
   }, [isAuthed, setSession]);
 
   return (

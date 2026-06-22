@@ -1,6 +1,7 @@
 import type { Meeting } from "./mock";
 
-export const buildMeetingLink = (id: string) => `${window.location.origin}/app/room/${id}`;
+export const buildMeetingLink = (id: string) =>
+  `${window.location.origin}/app/room/${id}`;
 
 export async function copyText(value: string) {
   if (navigator.clipboard?.writeText) {
@@ -17,7 +18,11 @@ export async function copyText(value: string) {
   document.body.removeChild(el);
 }
 
-export function downloadText(filename: string, content: string, type = "text/plain;charset=utf-8") {
+export function downloadText(
+  filename: string,
+  content: string,
+  type = "text/plain;charset=utf-8",
+) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -52,5 +57,8 @@ export function csv(rows: Record<string, string | number>[]) {
   if (!rows.length) return "";
   const keys = Object.keys(rows[0]);
   const esc = (v: string | number) => `"${String(v).replaceAll('"', '""')}"`;
-  return [keys.join(","), ...rows.map((row) => keys.map((key) => esc(row[key])).join(","))].join("\n");
+  return [
+    keys.join(","),
+    ...rows.map((row) => keys.map((key) => esc(row[key])).join(",")),
+  ].join("\n");
 }

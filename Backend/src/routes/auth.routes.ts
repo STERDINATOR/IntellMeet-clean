@@ -7,6 +7,7 @@ import { z } from "zod";
 import { signAccessToken, signRefreshToken, requireAuth } from "../auth.js";
 import { env } from "../config/env.js";
 import { User, Workspace } from "../models.js";
+import { createAuditLog } from "../realtime.js";
 
 export const authRouter = Router();
 
@@ -77,6 +78,7 @@ authRouter.post("/signup", async (req, res) => {
   const refreshToken = signRefreshToken(user as never);
   user.refreshTokenHash = await bcrypt.hash(refreshToken, 12);
   await user.save();
+  await createAuditLog({ workspaceId: String(workspace._id), actorUserId: String(user._id), eventType: "auth.signup", resourceType: "user", resourceId: String(user._id), after: { email: user.email, name: user.name }, ip: String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? ""), device: String(req.headers["user-agent"] ?? "") });
   return res.status(201).json({ user, accessToken, refreshToken });
 });
 
@@ -84,6 +86,7 @@ authRouter.post("/login", async (req, res) => {
   const data = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);
   const user = await User.findOne({ email: data.email.toLowerCase() });
   if (!user || !(await bcrypt.compare(data.password, user.passwordHash))) {
+    await createAuditLog({ eventType: "auth.login_failed", severity: "warn", resourceType: "user", resourceId: data.email, ip: String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? ""), device: String(req.headers["user-agent"] ?? "") });
     return res.status(401).json({ message: "Invalid credentials" });
   }
   const accessToken = signAccessToken(user as never);
@@ -91,6 +94,7 @@ authRouter.post("/login", async (req, res) => {
   user.refreshTokenHash = await bcrypt.hash(refreshToken, 12);
   user.online = true;
   await user.save();
+  await createAuditLog({ workspaceId: String(user.workspaceId), actorUserId: String(user._id), eventType: "auth.login", resourceType: "user", resourceId: String(user._id), ip: String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? ""), device: String(req.headers["user-agent"] ?? "") });
   return res.json({ user, accessToken, refreshToken });
 });
 
@@ -228,6 +232,7 @@ authRouter.post("/logout", requireAuth, async (req, res) => {
     user.refreshTokenHash = undefined;
     await user.save();
   }
+  await createAuditLog({ workspaceId: String(req.user!.workspaceId), actorUserId: String(req.user!._id), eventType: "auth.logout", resourceType: "user", resourceId: String(req.user!._id), ip: String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? ""), device: String(req.headers["user-agent"] ?? "") });
   return res.sendStatus(204);
 });
 

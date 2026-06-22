@@ -8,7 +8,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api/client";
 
-export const Route = createFileRoute("/reset-password")({ component: ResetPassword });
+export const Route = createFileRoute("/reset-password")({
+  component: ResetPassword,
+});
 
 function ResetPassword() {
   const navigate = useNavigate();
@@ -48,30 +50,59 @@ function ResetPassword() {
       <div className="absolute inset-0 bg-gradient-glow" />
       <Card className="relative w-full max-w-md p-8 glass elevated">
         <Link to="/" className="flex items-center gap-2 mb-8">
-          <div className="h-9 w-9 rounded-xl gradient-primary glow flex items-center justify-center"><MessageSquare className="h-5 w-5 text-primary-foreground" /></div>
+          <div className="h-9 w-9 rounded-xl gradient-primary glow flex items-center justify-center">
+            <MessageSquare className="h-5 w-5 text-primary-foreground" />
+          </div>
           <span className="font-bold">IntellMeet</span>
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Create a new password</h1>
-        <p className="text-sm text-muted-foreground mt-1">Secure your workspace session with a new password.</p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Create a new password
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Secure your workspace session with a new password.
+        </p>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div className="space-y-1.5">
             <Label>Email</Label>
-            <Input type="email" value={email} readOnly className="bg-secondary/60" />
+            <Input
+              type="email"
+              value={email}
+              readOnly
+              className="bg-secondary/60"
+            />
           </div>
           <div className="space-y-1.5">
             <Label>New password</Label>
-            <Input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <Input
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Confirm password</Label>
-            <Input type="password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required />
+            <Input
+              type="password"
+              minLength={8}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+            />
           </div>
-          <Button type="submit" disabled={loading || !token} className="w-full gradient-primary text-primary-foreground border-0 glow">
+          <Button
+            type="submit"
+            disabled={loading || !token}
+            className="w-full gradient-primary text-primary-foreground border-0 glow"
+          >
             {loading ? "Resetting…" : "Reset password"}
           </Button>
         </form>
         {!token && (
-          <p className="text-sm text-muted-foreground mt-4">A reset token is required. Please use the link from your email.</p>
+          <p className="text-sm text-muted-foreground mt-4">
+            A reset token is required. Please use the link from your email.
+          </p>
         )}
       </Card>
     </div>

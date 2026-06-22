@@ -4,24 +4,24 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import morgan from "morgan";
 import { ZodError } from "zod";
-import { env } from "./config/env.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { domainRouter } from "./routes/domain.routes.js";
 import { aiRouter } from "./routes/ai.routes.js";
+import { analyticsRouter } from "./routes/analytics.routes.js";
+import { userRouter } from "./routes/user.routes.js";
 
 export function createApp() {
   const app = express();
   app.use(helmet());
-  app.use(cors({ 
+  app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests from localhost and 127.0.0.1 on any port (development)
       if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1")) {
         callback(null, true);
       } else {
         callback(new Error("CORS policy violation"));
       }
     },
-    credentials: true 
+    credentials: true,
   }));
   app.use(cookieParser());
   app.use(express.json({ limit: "2mb" }));
@@ -30,6 +30,8 @@ export function createApp() {
   app.get("/health", (_req, res) => res.json({ ok: true, service: "intellmeet-backend" }));
   app.use("/api/auth", authRouter);
   app.use("/api/ai", aiRouter);
+  app.use("/api/analytics", analyticsRouter);
+  app.use("/api", userRouter);
   app.use("/api", domainRouter);
 
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
