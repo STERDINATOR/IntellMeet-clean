@@ -1,4 +1,4 @@
-import type { Meeting } from "./mock";
+import type { Meeting } from "@/lib/api/domain";
 
 export const buildMeetingLink = (id: string) =>
   `${window.location.origin}/app/room/${id}`;

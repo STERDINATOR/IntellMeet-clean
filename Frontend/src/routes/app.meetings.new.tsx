@@ -63,7 +63,10 @@ function NewMeeting() {
               duration: Number(f.get("duration")),
               status: "upcoming",
               participants: selected,
-              host: "me",
+              // Host and participants are stored as Mongo ObjectIds on the backend.
+              // Backend derives host from req.user, and also ignores placeholder "me".
+              // So we pass a placeholder for host only if needed; participants use real user ids.
+              host: "me" as unknown as never as string,
               type: type as "Team" | "Client" | "1:1" | "All-hands",
               agenda: String(f.get("agenda")),
             });

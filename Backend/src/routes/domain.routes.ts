@@ -13,7 +13,8 @@ const ua = (req: import("express").Request) => String((req as any).headers?.["us
 
 // ─── Meetings ─────────────────────────────────────────────────────────────────
 domainRouter.get("/meetings", async (req, res) => {
-  res.json(await Meeting.find(ws(req)).sort({ start: -1 }));
+  const userId = String(req.user!._id);
+  res.json(await Meeting.find({ ...ws(req), $or: [{ host: userId }, { participants: userId }] }).sort({ start: -1 }));
 });
 
 domainRouter.get("/meetings/:id", async (req, res) => {
@@ -29,12 +30,21 @@ domainRouter.post("/meetings", async (req, res) => {
     duration: z.number().default(30),
     type: z.enum(["Team", "Client", "1:1", "All-hands"]).default("Team"),
     agenda: z.string().optional(),
+    // participants are user ObjectIds in Mongo.
+    // Frontend sometimes sends placeholders like "me" (string), so we sanitize below.
     participants: z.array(z.string()).default([]),
     status: z.enum(["upcoming", "live", "ended"]).default("upcoming"),
   }).parse(req.body);
 
+  const sanitizeUserIds = (ids: string[]) => {
+    const valid = ids.filter((x) => typeof x === "string" && x.length > 0);
+    // Treat placeholder "me" as empty (host is derived from req.user).
+    return valid.filter((x) => x !== "me");
+  };
+
   const meeting = await Meeting.create({
     ...body,
+    participants: sanitizeUserIds(body.participants),
     workspaceId: req.user!.workspaceId,
     host: req.user!._id,
     roomId: `room_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -90,7 +100,8 @@ domainRouter.post("/meetings/:id/transcripts", async (req, res) => {
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 domainRouter.get("/tasks", async (req, res) => {
-  res.json(await Task.find(ws(req)).sort({ updatedAt: -1 }));
+  const userId = String(req.user!._id);
+  res.json(await Task.find({ ...ws(req), assignee: userId }).sort({ updatedAt: -1 }));
 });
 
 domainRouter.get("/tasks/:id", async (req, res) => {
@@ -100,7 +111,10 @@ domainRouter.get("/tasks/:id", async (req, res) => {
 });
 
 domainRouter.post("/tasks", async (req, res) => {
-  const task = await Task.create({ ...req.body, workspaceId: req.user!.workspaceId });
+  const body = { ...req.body };
+  if (body.project === "" || body.project == null) delete body.project;
+  if (body.assignee === "" || body.assignee == null) delete body.assignee;
+  const task = await Task.create({ ...body, workspaceId: req.user!.workspaceId });
   emitToWorkspace(String(req.user!.workspaceId), "task:created", task);
   if (task.assignee) {
     const n = await Notification.create({ workspaceId: req.user!.workspaceId, userId: task.assignee, type: "task", title: `Task assigned: ${task.title}`, body: `Assigned by ${req.user!.name}` }).catch(() => null);
@@ -130,7 +144,8 @@ domainRouter.delete("/tasks/:id", async (req, res) => {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 domainRouter.get("/projects", async (req, res) => {
-  res.json(await Project.find(ws(req)).sort({ updatedAt: -1 }));
+  const userId = String(req.user!._id);
+  res.json(await Project.find({ ...ws(req), members: userId }).sort({ updatedAt: -1 }));
 });
 
 domainRouter.get("/projects/:id", async (req, res) => {

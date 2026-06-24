@@ -10,8 +10,8 @@ import {
   meetingService,
   aiService,
   transcriptService,
+  userService,
 } from "@/lib/api/services";
-import { findUser, transcriptSample } from "@/lib/mock";
 import { format } from "date-fns";
 import {
   Download,
@@ -119,28 +119,9 @@ function TranscriptTab({ meetingId }: { meetingId: string }) {
             text: string;
             atSeconds: number;
           }>,
-        ) =>
-          setLines(
-            data.length
-              ? data
-              : transcriptSample.map((s, i) => ({
-                  _id: i,
-                  speaker: s.speaker,
-                  text: s.text,
-                  atSeconds: i * 18,
-                })),
-          ),
+        ) => setLines(data.length ? data : []),
       )
-      .catch(() =>
-        setLines(
-          transcriptSample.map((s, i) => ({
-            _id: i,
-            speaker: s.speaker,
-            text: s.text,
-            atSeconds: i * 18,
-          })),
-        ),
-      )
+      .catch(() => setLines([]))
       .finally(() => setLoading(false));
   }, [meetingId]);
 
@@ -156,9 +137,7 @@ function TranscriptTab({ meetingId }: { meetingId: string }) {
       {lines.map((s, i) => (
         <div key={s._id ?? i} className="flex gap-3">
           <div className="text-xs text-muted-foreground w-16 pt-1 shrink-0">
-            {s.atSeconds != null
-              ? `${s.atSeconds}s`
-              : (transcriptSample[i]?.t ?? "")}
+            {s.atSeconds != null ? `${s.atSeconds}s` : ""}
           </div>
           <div className="flex-1">
             <div className="text-sm font-semibold">{s.speaker}</div>
@@ -236,6 +215,9 @@ function MeetingDetail() {
   const [remoteMeeting, setRemoteMeeting] = useState<typeof meeting | null>(
     null,
   );
+  const [teamUsers, setTeamUsers] = useState<
+    Array<{ id: string; name: string; avatar?: string; role?: string }>
+  >([]);
 
   useEffect(() => {
     if (!meeting) {
@@ -246,11 +228,48 @@ function MeetingDetail() {
         })
         .catch(() => toast.error("Unable to load meeting details."));
     }
+
+    userService
+      .list()
+      .then((data) => {
+        const normalized = (data as unknown[])
+          .map(
+            (u) =>
+              u as {
+                id?: string;
+                _id?: string;
+                name?: string;
+                avatar?: string;
+                role?: string;
+              },
+          )
+          .filter(
+            (u) =>
+              typeof u?.name === "string" &&
+              typeof (u.id ?? u._id) === "string",
+          )
+          .map((u) => ({
+            id: u.id ?? u._id!,
+            name: u.name!,
+            avatar: u.avatar,
+            role: u.role,
+          }));
+        setTeamUsers(normalized);
+      })
+      .catch(() => undefined);
   }, [id, meeting]);
 
   const currentMeeting = meeting ?? remoteMeeting;
   if (!currentMeeting)
     return <div className="text-muted-foreground">Meeting not found.</div>;
+
+  const getUser = (userId: string) =>
+    teamUsers.find((u) => u.id === userId) ?? {
+      id: userId,
+      name: "Unknown",
+      avatar: "",
+      role: "",
+    };
 
   return (
     <div>
@@ -346,12 +365,9 @@ function MeetingDetail() {
               <ActionsTab meetingId={id} />
             </TabsContent>
             <TabsContent value="timeline" className="mt-4 space-y-3">
-              {transcriptSample.slice(0, 5).map((s, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className="text-xs w-12 text-primary">{s.t}</div>
-                  <div className="text-sm">{s.text}</div>
-                </div>
-              ))}
+              <p className="text-sm text-muted-foreground">
+                Timeline view coming soon.
+              </p>
             </TabsContent>
           </Tabs>
         </Card>
@@ -361,7 +377,7 @@ function MeetingDetail() {
             <div className="font-semibold mb-3">Participants</div>
             <div className="space-y-2">
               {currentMeeting.participants.map((pid) => {
-                const u = findUser(pid);
+                const u = getUser(pid);
                 return (
                   <div key={pid} className="flex items-center gap-3">
                     <Avatar className="h-8 w-8">

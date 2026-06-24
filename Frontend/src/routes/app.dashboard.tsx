@@ -22,7 +22,6 @@ import {
   taskService,
   analyticsService,
 } from "@/lib/api/services";
-import { analytics } from "@/lib/mock";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ResponsiveContainer,
@@ -281,9 +280,7 @@ function Dashboard() {
           <div className="font-semibold mb-3">Team productivity</div>
           <div className="h-48">
             <ResponsiveContainer>
-              <AreaChart
-                data={liveAnalytics?.meetingTrends ?? analytics.meetingTrends}
-              >
+              <AreaChart data={liveAnalytics?.meetingTrends ?? []}>
                 <defs>
                   <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
                     <stop

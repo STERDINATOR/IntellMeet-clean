@@ -21,7 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { users as mockUsers } from "@/lib/mock";
 import { Search, UserPlus, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api/client";
@@ -34,30 +33,65 @@ export const Route = createFileRoute("/app/team")({ component: Team });
 function Team() {
   const [q, setQ] = useState("");
   const [dept, setDept] = useState("all");
-  const [teamMembers, setTeamMembers] = useState(mockUsers);
+  const [teamMembers, setTeamMembers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      email?: string;
+      avatar?: string;
+      role: string;
+      department?: string;
+      online?: boolean;
+    }>
+  >([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const onlineUserIds = useSocketStore((s) => s.onlineUserIds);
 
   useEffect(() => {
+    type UserApi = {
+      id?: string;
+      _id?: string;
+      name?: string;
+      email?: string;
+      avatar?: string;
+      role?: string;
+      department?: string;
+      online?: boolean;
+    };
+
     apiClient
-      .get<any[]>("/users")
+      .get<unknown[]>("/users")
       .then((data) => {
-        if (data?.length) {
-          setTeamMembers(
-            data.map((u) => ({
-              id: u.id ?? u._id,
-              name: u.name,
+        if (!Array.isArray(data) || data.length === 0) return;
+
+        const normalized = (data as unknown[])
+          .map((u) => u as UserApi)
+          .filter(
+            (
+              u,
+            ): u is Required<Pick<UserApi, "name" | "role">> &
+              UserApi & { id: string } =>
+              typeof u?.name === "string" &&
+              typeof u?.role === "string" &&
+              typeof (u.id ?? u._id) === "string",
+          )
+          .map((u) => {
+            const id = (u.id ?? u._id)!;
+            return {
+              id,
+              name: u.name!,
               email: u.email,
               avatar:
                 u.avatar ??
                 `https://api.dicebear.com/9.x/glass/svg?seed=${u.name}`,
-              role: u.role,
+              role: u.role!,
               department: u.department ?? "General",
               online: u.online ?? false,
-            })),
-          );
-        }
+            };
+          });
+
+        setTeamMembers(normalized as typeof teamMembers);
       })
       .catch(() => undefined);
   }, []);
@@ -80,7 +114,13 @@ function Team() {
 
   const depts = [
     "all",
-    ...Array.from(new Set(teamMembers.map((u) => u.department))),
+    ...Array.from(
+      new Set(
+        teamMembers
+          .map((u) => u.department)
+          .filter((d): d is string => typeof d === "string"),
+      ),
+    ),
   ];
   const filtered = teamMembers.filter(
     (u) =>

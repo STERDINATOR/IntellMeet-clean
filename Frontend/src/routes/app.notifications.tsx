@@ -15,7 +15,7 @@ import {
   Building,
 } from "lucide-react";
 import { useEffect } from "react";
-import type { Notification } from "@/lib/mock";
+import type { Notification } from "@/lib/api/domain";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/notifications")({

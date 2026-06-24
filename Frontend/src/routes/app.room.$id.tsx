@@ -20,8 +20,7 @@ import {
   StopCircle,
   Loader2,
 } from "lucide-react";
-import { useMeetingsStore } from "@/lib/stores";
-import { findUser, transcriptSample, currentUser } from "@/lib/mock";
+import { useMeetingsStore, useAuthStore } from "@/lib/stores";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -49,6 +48,66 @@ type TranscriptLineDelta = {
   atSeconds: number;
 };
 
+type MeetingLike = { id: string; title?: string; participants: string[] };
+
+type ChatMessage = {
+  user: string;
+  text: string;
+};
+
+type TranscriptLine = {
+  id: string;
+  speaker: string;
+  text: string;
+  atSeconds: number;
+};
+
+type SocketUserEventChatMessage = {
+  userId?: string;
+  name?: string;
+  text: string;
+};
+
+type SocketPeerJoined = { peerId: string };
+
+type SocketExistingPeers = { peerId: string; userId: string };
+
+type SocketWebrtcOfferEvent = {
+  from: string;
+  offer: RTCSessionDescriptionInit;
+};
+
+type SocketWebrtcAnswerEvent = {
+  from: string;
+  answer: RTCSessionDescriptionInit;
+};
+
+type SocketIceCandidateEvent = {
+  from: string;
+  candidate: RTCIceCandidateInit;
+};
+
+type SocketPeerLeft = { peerId: string };
+
+type SocketTranscriptCreated = {
+  _id?: string;
+  id?: string;
+  speaker?: string;
+  text?: string;
+  atSeconds?: number;
+};
+
+type SocketTranscriptUpdated = { meetingId?: string };
+
+type SocketAiInsightsUpdated = { insights: Array<{ title?: string }> };
+
+type RemoteUser = {
+  id: string;
+  name: string;
+  avatar?: string;
+  role?: string;
+};
+
 function VideoTile({
   stream,
   muted = false,
@@ -59,11 +118,13 @@ function VideoTile({
   className?: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.srcObject = stream;
   }, [stream]);
+
   return (
     <video
       ref={ref}
@@ -82,7 +143,7 @@ function Room() {
   const navigate = useNavigate();
   const setMediaState = useMeetingMediaStore((s) => s.set);
 
-  const [remoteMeeting, setRemoteMeeting] = useState<unknown>(null);
+  const [remoteMeeting, setRemoteMeeting] = useState<MeetingLike | null>(null);
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
   const [share, setShare] = useState(false);
@@ -90,32 +151,92 @@ function Room() {
   const [caps, setCaps] = useState(true);
   const [rec, setRec] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+
   const [remoteStreams, setRemoteStreams] = useState<
     Record<string, MediaStream>
   >({});
-  const [chat, setChat] = useState<{ user: string; text: string }[]>([
-    { user: "Aria Chen", text: "Welcome team!" },
-  ]);
+
+  const [chat, setChat] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [transcript, setTranscript] = useState<
-    Array<{ id: string; speaker: string; text: string; atSeconds: number }>
-  >([]);
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [generatingTasks, setGeneratingTasks] = useState(false);
   const [liveInsights, setLiveInsights] = useState<string[]>([]);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  type MeetingLike = { id: string; title?: string; participants: string[] };
-  const activeMeeting = (meeting ??
-    remoteMeeting) as Partial<MeetingLike> | null;
+  const activeMeeting = (meeting ?? remoteMeeting) as
+    | (Partial<MeetingLike> & { participants?: string[] })
+    | null;
 
-  const participants = activeMeeting
+  const currentUser = useAuthStore((s) => s.user);
+  const [teamUsers, setTeamUsers] = useState<
+    Array<{ id: string; name: string; avatar?: string; role?: string }>
+  >([]);
+
+  useEffect(() => {
+    import("@/lib/api/services").then(({ userService }) =>
+      userService
+        .list()
+        .then((data) => {
+          const normalized = (data as unknown[])
+            .map(
+              (u) =>
+                u as {
+                  id?: string;
+                  _id?: string;
+                  name?: string;
+                  avatar?: string;
+                  role?: string;
+                },
+            )
+            .filter(
+              (u) =>
+                typeof u?.name === "string" &&
+                typeof (u.id ?? u._id) === "string",
+            )
+            .map((u) => ({
+              id: u.id ?? u._id!,
+              name: u.name!,
+              avatar: u.avatar,
+              role: u.role,
+            }));
+          setTeamUsers(normalized);
+        })
+        .catch(() => undefined),
+    );
+  }, []);
+
+  const getUser = (id: string) =>
+    teamUsers.find((u) => u.id === id) ?? {
+      id,
+      name: "Unknown",
+      avatar: "",
+      role: "",
+    };
+
+  const participants: RemoteUser[] = activeMeeting
     ? [
-        currentUser,
+        {
+          id: currentUser.id,
+          name: currentUser.name ?? "Unknown",
+          avatar: currentUser.avatar,
+          role: currentUser.role,
+        },
         ...(activeMeeting.participants ?? [])
           .filter((p) => p !== "me")
-          .map(findUser),
+          .map((pid) => {
+            const u = getUser(pid);
+            return { id: u.id, name: u.name, avatar: u.avatar, role: u.role };
+          }),
       ]
-    : [currentUser];
+    : [
+        {
+          id: currentUser.id,
+          name: currentUser.name ?? "Unknown",
+          avatar: currentUser.avatar,
+          role: currentUser.role,
+        },
+      ];
 
   const remoteParticipants = participants.filter((p) => p.id !== "me");
 
@@ -125,6 +246,7 @@ function Room() {
         meetingId: id,
         speaker: line.speaker,
         text: line.text,
+        // keep atSeconds deterministic client-side for UI ordering
         atSeconds: 0,
       } satisfies TranscriptLineDelta);
     },
@@ -140,9 +262,11 @@ function Room() {
     peerConnectionManager.onIceCandidate = (peerId, candidate) => {
       socketClient.emit("webrtc:ice-candidate", { to: peerId, candidate });
     };
+
     peerConnectionManager.onRemoteTrack = (peerId, stream) => {
       setRemoteStreams((prev) => ({ ...prev, [peerId]: stream }));
     };
+
     return () => {
       peerConnectionManager.onIceCandidate = null;
       peerConnectionManager.onRemoteTrack = null;
@@ -152,9 +276,13 @@ function Room() {
   // Acquire local camera+mic
   useEffect(() => {
     let cancelled = false;
+
     localStreamManager.acquire().then((stream) => {
-      if (!cancelled) setLocalStream(stream);
+      if (!cancelled) {
+        setLocalStream(stream);
+      }
     });
+
     return () => {
       cancelled = true;
     };
@@ -166,7 +294,7 @@ function Room() {
       meetingService
         .get(id)
         .then((remote) => {
-          if (remote) setRemoteMeeting(remote as unknown);
+          if (remote) setRemoteMeeting(remote);
         })
         .catch(() => toast.error("Unable to load meeting details."));
     }
@@ -177,7 +305,7 @@ function Room() {
       .then((msgs) => {
         if (msgs?.length) {
           setChat(
-            msgs.map((m: any) => ({
+            msgs.map((m: { name?: string; userId?: string; text: string }) => ({
               user: m.name ?? m.userId ?? "Teammate",
               text: m.text,
             })),
@@ -188,76 +316,72 @@ function Room() {
 
     socketClient.emit("meeting:join", { roomId: id });
 
-    const offChat = socketClient.on<{
-      userId?: string;
-      name?: string;
-      text: string;
-    }>("chat:message", (msg) => {
-      setChat((prev) => [
-        ...prev,
-        {
-          user: msg.name ?? (msg.userId === "me" ? "You" : "Teammate"),
-          text: msg.text,
-        },
-      ]);
-    });
-
-    const offPeerJoined = socketClient.on<{ peerId: string }>(
-      "meeting:peer-joined",
-      async ({ peerId }) => {
-        const offer = await peerConnectionManager.createOffer(
-          peerId,
-          localStreamManager.get(),
-        );
-        socketClient.emit("webrtc:offer", { to: peerId, offer });
+    const offChat = socketClient.on<SocketUserEventChatMessage>(
+      "chat:message",
+      (msg) => {
+        setChat((prev) => [
+          ...prev,
+          {
+            user: msg.name ?? (msg.userId === "me" ? "You" : "Teammate"),
+            text: msg.text,
+          },
+        ]);
       },
     );
 
-    const offExistingPeers = socketClient.on<
-      { peerId: string; userId: string }[]
-    >("meeting:existing-peers", async (peers) => {
-      for (const { peerId } of peers) {
-        const offer = await peerConnectionManager.createOffer(
-          peerId,
+    const offPeerJoined = socketClient.on<SocketPeerJoined>(
+      "meeting:peer-joined",
+      () => {
+        // New peer will initiate the offer; existing peers wait to receive it.
+      },
+    );
+
+    const offExistingPeers = socketClient.on<SocketExistingPeers[]>(
+      "meeting:existing-peers",
+      async (peers) => {
+        for (const { peerId } of peers) {
+          const offer = await peerConnectionManager.createOffer(
+            peerId,
+            localStreamManager.get(),
+          );
+          socketClient.emit("webrtc:offer", { to: peerId, offer });
+        }
+      },
+    );
+
+    const offOffer = socketClient.on<SocketWebrtcOfferEvent>(
+      "webrtc:offer",
+      async ({ from, offer }) => {
+        const answer = await peerConnectionManager.createAnswer(
+          from,
+          offer,
           localStreamManager.get(),
         );
-        socketClient.emit("webrtc:offer", { to: peerId, offer });
-      }
-    });
+        socketClient.emit("webrtc:answer", { to: from, answer });
+      },
+    );
 
-    const offOffer = socketClient.on<{
-      from: string;
-      offer: RTCSessionDescriptionInit;
-    }>("webrtc:offer", async ({ from, offer }) => {
-      const answer = await peerConnectionManager.createAnswer(
-        from,
-        offer,
-        localStreamManager.get(),
-      );
-      socketClient.emit("webrtc:answer", { to: from, answer });
-    });
+    const offAnswer = socketClient.on<SocketWebrtcAnswerEvent>(
+      "webrtc:answer",
+      ({ from, answer }) => {
+        peerConnectionManager
+          .get(from)
+          ?.setRemoteDescription(answer)
+          .catch(() => undefined);
+      },
+    );
 
-    const offAnswer = socketClient.on<{
-      from: string;
-      answer: RTCSessionDescriptionInit;
-    }>("webrtc:answer", ({ from, answer }) => {
-      peerConnectionManager
-        .get(from)
-        ?.setRemoteDescription(answer)
-        .catch(() => undefined);
-    });
+    const offIce = socketClient.on<SocketIceCandidateEvent>(
+      "webrtc:ice-candidate",
+      ({ from, candidate }) => {
+        peerConnectionManager
+          .get(from)
+          ?.addIceCandidate(candidate)
+          .catch(() => undefined);
+      },
+    );
 
-    const offIce = socketClient.on<{
-      from: string;
-      candidate: RTCIceCandidateInit;
-    }>("webrtc:ice-candidate", ({ from, candidate }) => {
-      peerConnectionManager
-        .get(from)
-        ?.addIceCandidate(candidate)
-        .catch(() => undefined);
-    });
-
-    const offPeerLeft = socketClient.on<{ peerId: string }>(
+    const offPeerLeft = socketClient.on<SocketPeerLeft>(
       "meeting:peer-left",
       ({ peerId }) => {
         peerConnectionManager.close(peerId);
@@ -269,7 +393,7 @@ function Room() {
       },
     );
 
-    const offTranscript = socketClient.on<any>(
+    const offTranscript = socketClient.on<SocketTranscriptCreated>(
       "transcript:created",
       (created) => {
         setTranscript((prev) => [
@@ -287,17 +411,19 @@ function Room() {
       },
     );
 
-    const offTranscriptUpdated = socketClient.on<any>(
+    const offTranscriptUpdated = socketClient.on<SocketTranscriptUpdated>(
       "transcript:updated",
       () => {},
     );
 
-    // Listen for AI insights pushed by the backend
-    const offAiInsights = socketClient.on<any>(
+    const offAiInsights = socketClient.on<SocketAiInsightsUpdated>(
       "ai:insights_updated",
       ({ insights }) => {
-        if (Array.isArray(insights))
-          setLiveInsights(insights.map((i: any) => i.title ?? String(i)));
+        if (Array.isArray(insights)) {
+          setLiveInsights(
+            insights.map((i) => i.title ?? String(i)).filter(Boolean),
+          );
+        }
       },
     );
 
@@ -319,13 +445,13 @@ function Room() {
       setRemoteStreams({});
       stop();
     };
-  }, [id]);
+  }, [id, meeting, stop]);
 
   useEffect(() => {
     if (!supported) return;
     if (rec && !listening) start();
     if (!rec && listening) stop();
-  }, [rec, supported]);
+  }, [rec, supported, listening, start, stop]);
 
   const toggleMic = useCallback(() => {
     const next = !mic;
@@ -337,7 +463,7 @@ function Room() {
       control: "mic",
       value: next,
     });
-  }, [mic, id]);
+  }, [mic, id, setMediaState]);
 
   const toggleCam = useCallback(() => {
     const next = !cam;
@@ -349,40 +475,48 @@ function Room() {
       control: "camera",
       value: next,
     });
-  }, [cam, id]);
+  }, [cam, id, setMediaState]);
 
   const toggleScreenShare = useCallback(async () => {
     if (share) {
       setShare(false);
       setMediaState({ screenSharing: false });
       await localStreamManager.restoreCamera();
+
       const camTrack = localStreamManager.get()?.getVideoTracks()[0] ?? null;
       peerConnectionManager.replaceTrack("video", camTrack);
       setLocalStream(localStreamManager.get());
+
       socketClient.emit("meeting:control", {
         roomId: id,
         control: "screenSharing",
         value: false,
       });
+
       toast.success("Stopped sharing");
       return;
     }
+
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
       });
+
       const screenTrack = screenStream.getVideoTracks()[0];
       peerConnectionManager.replaceTrack("video", screenTrack);
       localStreamManager.replaceWithScreenTrack(screenStream);
       setLocalStream(localStreamManager.get());
+
       screenTrack.onended = async () => {
         setShare(false);
         setMediaState({ screenSharing: false });
         await localStreamManager.restoreCamera();
+
         const t = localStreamManager.get()?.getVideoTracks()[0] ?? null;
         peerConnectionManager.replaceTrack("video", t);
         setLocalStream(localStreamManager.get());
+
         socketClient.emit("meeting:control", {
           roomId: id,
           control: "screenSharing",
@@ -390,6 +524,7 @@ function Room() {
         });
         toast.success("Stopped sharing");
       };
+
       setShare(true);
       setMediaState({ screenSharing: true });
       socketClient.emit("meeting:control", {
@@ -398,10 +533,11 @@ function Room() {
         value: true,
       });
       toast.success("Started sharing");
-    } catch {
-      toast.error("Screen sharing permission was not granted");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Screen sharing permission was not granted (${msg})`);
     }
-  }, [share, id]);
+  }, [share, id, setMediaState]);
 
   const leave = async () => {
     socketClient.emit("meeting:leave", { roomId: id });
@@ -415,7 +551,7 @@ function Room() {
   const generateTasks = async () => {
     setGeneratingTasks(true);
     try {
-      const items = await apiClient.post<any[]>(
+      const items = await apiClient.post<Array<unknown>>(
         `/ai/meetings/${id}/action-items`,
       );
       toast.success(`${items.length} tasks generated from meeting transcript`);
@@ -468,7 +604,9 @@ function Room() {
               ) : (
                 <Avatar className="h-24 w-24 ring-4 ring-primary/30">
                   <AvatarImage src={currentUser.avatar} />
-                  <AvatarFallback>{currentUser.name[0]}</AvatarFallback>
+                  <AvatarFallback>
+                    {(currentUser.name ?? "U")[0]}
+                  </AvatarFallback>
                 </Avatar>
               )}
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10">
@@ -621,15 +759,7 @@ function Room() {
               className="px-3 pb-3 overflow-y-auto space-y-2 m-0 data-[state=inactive]:hidden"
             >
               {transcript.length === 0
-                ? transcriptSample.map((s, i) => (
-                    <div key={i} className="text-sm">
-                      <span className="text-xs text-muted-foreground">
-                        {s.t}
-                      </span>{" "}
-                      <span className="font-semibold">{s.speaker}:</span>{" "}
-                      {s.text}
-                    </div>
-                  ))
+                ? []
                 : transcript.map((t) => (
                     <div key={t.id} className="text-sm">
                       <span className="text-xs text-muted-foreground">
@@ -710,6 +840,7 @@ function Room() {
         />
         <Ctl
           active={hand}
+          danger={false}
           onClick={() => {
             const next = !hand;
             setHand(next);
@@ -781,8 +912,9 @@ function Room() {
               value: next,
             });
             toast.success(next ? "Recording started" : "Recording stopped");
-            if (!supported && next)
+            if (!supported && next) {
               toast.error("Live transcription not supported in this browser.");
+            }
           }}
           on={Circle}
           off={Circle}
@@ -803,8 +935,8 @@ function Ctl({
 }: {
   active: boolean;
   onClick: () => void;
-  on: React.ComponentType<any>;
-  off: React.ComponentType<any>;
+  on: React.ComponentType<{ className?: string }>;
+  off: React.ComponentType<{ className?: string }>;
   label: string;
   danger?: boolean;
 }) {
@@ -812,7 +944,13 @@ function Ctl({
     <button
       onClick={onClick}
       title={label}
-      className={`h-12 w-12 rounded-full flex items-center justify-center transition ${danger && active ? "bg-destructive text-destructive-foreground" : active ? "gradient-primary text-primary-foreground glow" : "bg-secondary text-foreground hover:bg-secondary/70"}`}
+      className={`h-12 w-12 rounded-full flex items-center justify-center transition ${
+        danger && active
+          ? "bg-destructive text-destructive-foreground"
+          : active
+            ? "gradient-primary text-primary-foreground glow"
+            : "bg-secondary text-foreground hover:bg-secondary/70"
+      }`}
     >
       {active ? <On className="h-5 w-5" /> : <Off className="h-5 w-5" />}
     </button>

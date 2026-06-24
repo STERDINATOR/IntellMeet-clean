@@ -16,7 +16,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectsStore, useTasksStore } from "@/lib/stores";
 import { projectService, taskService } from "@/lib/api/services";
-import { findUser } from "@/lib/mock";
+
+const avatarUrl = (name: string) =>
+  `https://api.dicebear.com/9.x/glass/svg?seed=${encodeURIComponent(name)}`;
+
+function getUserInitials(name: string) {
+  return name?.trim()?.[0]?.toUpperCase() ?? "?";
+}
+
 import { Sparkles, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -79,21 +86,16 @@ function Projects() {
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex -space-x-2">
-                  {p.members.slice(0, 3).map((id) => {
-                    const u = findUser(id);
-                    return (
-                      <Avatar
-                        key={id}
-                        className="h-7 w-7 ring-2 ring-background"
-                      >
-                        <AvatarImage src={u.avatar} />
-                        <AvatarFallback>{u.name[0]}</AvatarFallback>
-                      </Avatar>
-                    );
-                  })}
+                  {(p.members ?? []).slice(0, 3).map((id) => (
+                    <Avatar key={id} className="h-7 w-7 ring-2 ring-background">
+                      <AvatarImage src={avatarUrl(id)} />
+                      <AvatarFallback>{getUserInitials(id)}</AvatarFallback>
+                    </Avatar>
+                  ))}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {openCount} open • due {format(new Date(p.due), "MMM d")}
+                  {openCount} open • due{" "}
+                  {p.due ? format(new Date(p.due), "MMM d") : "—"}
                 </div>
               </div>
               <div className="mt-3 rounded-lg bg-secondary/40 p-2 text-xs flex items-start gap-2">

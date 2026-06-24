@@ -117,9 +117,22 @@ function Login() {
         connectRealtime();
 
         try {
-          const response = await apiClient.get<{ user: any }>("/auth/me");
+          type AuthUser = {
+            id?: string;
+            _id?: string;
+            name?: string;
+            role?: string;
+            email?: string;
+            avatar?: string;
+          };
+
+          const response = await apiClient.get<{ user?: AuthUser }>("/auth/me");
           if (response?.user) {
-            setSession({ user: response.user, accessToken, refreshToken });
+            setSession({
+              user: response.user,
+              accessToken,
+              refreshToken,
+            });
           }
         } catch (error) {
           console.error("Failed to load user after OAuth login", error);
@@ -143,8 +156,17 @@ function Login() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     try {
+      type AuthUser = {
+        id?: string;
+        _id?: string;
+        name?: string;
+        role?: string;
+        email?: string;
+        avatar?: string;
+      };
+
       const session = await apiClient.post<{
-        user: any;
+        user: AuthUser;
         accessToken: string;
         refreshToken: string;
       }>("/auth/login", {

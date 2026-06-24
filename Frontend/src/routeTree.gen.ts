@@ -23,6 +23,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as App_tasksRouteImport } from './routes/app_tasks'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AiAssistantRouteImport } from './routes/ai-assistant'
@@ -30,6 +31,8 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as MeetingMeetingIdRouteImport } from './routes/meeting.$meetingId'
+import { Route as App_roomIdRouteImport } from './routes/app_room.$id'
+import { Route as App_projectsIdRouteImport } from './routes/app_projects.$id'
 import { Route as AppTeamRouteImport } from './routes/app.team'
 import { Route as AppTasksRouteImport } from './routes/app.tasks'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
@@ -116,6 +119,11 @@ const CalendarRoute = CalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const App_tasksRoute = App_tasksRouteImport.update({
+  id: '/app_tasks',
+  path: '/app_tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -149,6 +157,16 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const MeetingMeetingIdRoute = MeetingMeetingIdRouteImport.update({
   id: '/meeting/$meetingId',
   path: '/meeting/$meetingId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const App_roomIdRoute = App_roomIdRouteImport.update({
+  id: '/app_room/$id',
+  path: '/app_room/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const App_projectsIdRoute = App_projectsIdRouteImport.update({
+  id: '/app_projects/$id',
+  path: '/app_projects/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTeamRoute = AppTeamRouteImport.update({
@@ -233,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/ai-assistant': typeof AiAssistantRoute
   '/analytics': typeof AnalyticsRoute
   '/app': typeof AppRouteWithChildren
+  '/app_tasks': typeof App_tasksRoute
   '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -256,6 +275,8 @@ export interface FileRoutesByFullPath {
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/app/team': typeof AppTeamRoute
+  '/app_projects/$id': typeof App_projectsIdRoute
+  '/app_room/$id': typeof App_roomIdRoute
   '/meeting/$meetingId': typeof MeetingMeetingIdRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -270,6 +291,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/ai-assistant': typeof AiAssistantRoute
   '/analytics': typeof AnalyticsRoute
+  '/app_tasks': typeof App_tasksRoute
   '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -293,6 +315,8 @@ export interface FileRoutesByTo {
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/app/team': typeof AppTeamRoute
+  '/app_projects/$id': typeof App_projectsIdRoute
+  '/app_room/$id': typeof App_roomIdRoute
   '/meeting/$meetingId': typeof MeetingMeetingIdRoute
   '/app': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -309,6 +333,7 @@ export interface FileRoutesById {
   '/ai-assistant': typeof AiAssistantRoute
   '/analytics': typeof AnalyticsRoute
   '/app': typeof AppRouteWithChildren
+  '/app_tasks': typeof App_tasksRoute
   '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -332,6 +357,8 @@ export interface FileRoutesById {
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/app/team': typeof AppTeamRoute
+  '/app_projects/$id': typeof App_projectsIdRoute
+  '/app_room/$id': typeof App_roomIdRoute
   '/meeting/$meetingId': typeof MeetingMeetingIdRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -349,6 +376,7 @@ export interface FileRouteTypes {
     | '/ai-assistant'
     | '/analytics'
     | '/app'
+    | '/app_tasks'
     | '/calendar'
     | '/dashboard'
     | '/forgot-password'
@@ -372,6 +400,8 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/tasks'
     | '/app/team'
+    | '/app_projects/$id'
+    | '/app_room/$id'
     | '/meeting/$meetingId'
     | '/app/'
     | '/app/meetings/$id'
@@ -386,6 +416,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/ai-assistant'
     | '/analytics'
+    | '/app_tasks'
     | '/calendar'
     | '/dashboard'
     | '/forgot-password'
@@ -409,6 +440,8 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/tasks'
     | '/app/team'
+    | '/app_projects/$id'
+    | '/app_room/$id'
     | '/meeting/$meetingId'
     | '/app'
     | '/app/meetings/$id'
@@ -424,6 +457,7 @@ export interface FileRouteTypes {
     | '/ai-assistant'
     | '/analytics'
     | '/app'
+    | '/app_tasks'
     | '/calendar'
     | '/dashboard'
     | '/forgot-password'
@@ -447,6 +481,8 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/tasks'
     | '/app/team'
+    | '/app_projects/$id'
+    | '/app_room/$id'
     | '/meeting/$meetingId'
     | '/app/'
     | '/app/meetings/$id'
@@ -463,6 +499,7 @@ export interface RootRouteChildren {
   AiAssistantRoute: typeof AiAssistantRoute
   AnalyticsRoute: typeof AnalyticsRoute
   AppRoute: typeof AppRouteWithChildren
+  App_tasksRoute: typeof App_tasksRoute
   CalendarRoute: typeof CalendarRoute
   DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -477,6 +514,8 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   TasksRoute: typeof TasksRoute
   TeamRoute: typeof TeamRoute
+  App_projectsIdRoute: typeof App_projectsIdRoute
+  App_roomIdRoute: typeof App_roomIdRoute
   MeetingMeetingIdRoute: typeof MeetingMeetingIdRoute
 }
 
@@ -580,6 +619,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app_tasks': {
+      id: '/app_tasks'
+      path: '/app_tasks'
+      fullPath: '/app_tasks'
+      preLoaderRoute: typeof App_tasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -627,6 +673,20 @@ declare module '@tanstack/react-router' {
       path: '/meeting/$meetingId'
       fullPath: '/meeting/$meetingId'
       preLoaderRoute: typeof MeetingMeetingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app_room/$id': {
+      id: '/app_room/$id'
+      path: '/app_room/$id'
+      fullPath: '/app_room/$id'
+      preLoaderRoute: typeof App_roomIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app_projects/$id': {
+      id: '/app_projects/$id'
+      path: '/app_projects/$id'
+      fullPath: '/app_projects/$id'
+      preLoaderRoute: typeof App_projectsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/team': {
@@ -783,6 +843,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiAssistantRoute: AiAssistantRoute,
   AnalyticsRoute: AnalyticsRoute,
   AppRoute: AppRouteWithChildren,
+  App_tasksRoute: App_tasksRoute,
   CalendarRoute: CalendarRoute,
   DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
@@ -797,6 +858,8 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   TasksRoute: TasksRoute,
   TeamRoute: TeamRoute,
+  App_projectsIdRoute: App_projectsIdRoute,
+  App_roomIdRoute: App_roomIdRoute,
   MeetingMeetingIdRoute: MeetingMeetingIdRoute,
 }
 export const routeTree = rootRouteImport

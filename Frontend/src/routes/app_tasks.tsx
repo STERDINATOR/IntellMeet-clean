@@ -35,7 +35,41 @@ import { useEffect, useState } from "react";
 import type { Task } from "@/lib/api/domain";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/app/tasks")({ component: Tasks });
+export const Route = createFileRoute("/app_tasks")({ component: Tasks });
+
+type ApiUser = {
+  id?: string;
+  _id?: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  role: string;
+  department?: string;
+  online?: boolean;
+};
+
+function normalizeUser(u: ApiUser): {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  role: string;
+  department?: string;
+  online?: boolean;
+} {
+  const id = u.id ?? u._id ?? "";
+  return {
+    ...u,
+    id,
+    name: u.name,
+    email: u.email ?? "",
+    avatar:
+      u.avatar ??
+      `https://api.dicebear.com/9.x/glass/svg?seed=${encodeURIComponent(u.name)}`,
+    department: u.department ?? "General",
+    online: u.online ?? false,
+  };
+}
 
 function Tasks() {
   const { tasks, setStatus } = useTasksStore();
@@ -61,38 +95,20 @@ function Tasks() {
   useEffect(() => {
     taskService.list().catch(() => toast.error("Unable to load tasks."));
     projectService.list().catch(() => toast.error("Unable to load projects."));
+
     userService
       .list()
       .then((data) => {
         if (!Array.isArray(data) || data.length === 0) return;
-
-        type UserApi = {
-          id?: string;
-          _id?: string;
-          name: string;
-          email?: string;
-          avatar?: string;
-          role: string;
-          department?: string;
-          online?: boolean;
-        };
-
-        const casted = data as unknown[];
-        const normalized = casted
-          .map((u) => u as Partial<UserApi>)
+        const normalized = (data as unknown[])
+          .map((u) => u as ApiUser)
           .filter(
-            (u): u is UserApi =>
+            (u) =>
               typeof u?.name === "string" &&
-              typeof u?.role === "string" &&
               typeof (u.id ?? u._id) === "string",
-          );
-
-        setTeamUsers(
-          normalized.map((u) => ({
-            ...u,
-            id: u.id ?? u._id!,
-          })) as typeof teamUsers,
-        );
+          )
+          .map(normalizeUser);
+        setTeamUsers(normalized);
       })
       .catch(() => undefined);
   }, []);
@@ -247,6 +263,7 @@ function Tasks() {
             </tbody>
           </table>
         </div>
+
         <div className="flex items-center justify-between p-3 border-t border-border/40">
           <div className="text-xs text-muted-foreground">
             Showing {paged.length} of {filtered.length}
@@ -274,111 +291,112 @@ function Tasks() {
 
       <Sheet open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <SheetContent className="w-[480px] sm:max-w-[480px]">
-          {open &&
-            (() => {
-              const u = getUser(open.assignee);
-              return (
-                <>
-                  <SheetHeader>
-                    <SheetTitle>{open.title}</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-6 space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {open.description}
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-xs text-muted-foreground">
-                          Assignee
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={u.avatar} />
-                          </Avatar>
-                          {u.name}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">Due</div>
-                        <div className="mt-1">
-                          {format(new Date(open.due), "MMM d, yyyy")}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">
-                          Priority
-                        </div>
-                        <Badge className="mt-1">{open.priority}</Badge>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">
-                          AI Score
-                        </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Sparkles className="h-3 w-3 text-primary" />
-                          {open.aiScore}
-                        </div>
-                      </div>
+          {open && (
+            <>
+              <SheetHeader>
+                <SheetTitle>{open.title}</SheetTitle>
+              </SheetHeader>
+
+              <div className="mt-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {open.description}
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-xs text-muted-foreground">
+                      Assignee
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">
-                        Status
-                      </div>
-                      <Select
-                        value={open.status}
-                        onValueChange={async (v) => {
-                          await taskService.update(open.id, {
-                            status: v as Task["status"],
-                          });
-                          setStatus(open.id, v as Task["status"]);
-                          setOpen({ ...open, status: v as Task["status"] });
-                          toast.success("Status updated");
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["todo", "in_progress", "review", "done"].map(
-                            (p) => (
-                              <SelectItem key={p} value={p}>
-                                {p.replace("_", " ")}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {open.tags.map((t) => (
-                        <Badge key={t} variant="outline">
-                          #{t}
-                        </Badge>
-                      ))}
-                    </div>
-                    <Button
-                      variant="destructive"
-                      onClick={async () => {
-                        await taskService.remove(open.id);
-                        toast.success("Task deleted");
-                        setOpen(null);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete task
-                    </Button>
-                    <div className="border-t border-border pt-3">
-                      <div className="text-xs text-muted-foreground mb-2">
-                        Comments
-                      </div>
-                      <div className="rounded-lg bg-secondary/40 p-3 text-sm text-muted-foreground">
-                        No comments yet.
-                      </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={getUser(open.assignee).avatar} />
+                      </Avatar>
+                      {getUser(open.assignee).name}
                     </div>
                   </div>
-                </>
-              );
-            })()}
+                  <div>
+                    <div className="text-xs text-muted-foreground">Due</div>
+                    <div className="mt-1">
+                      {format(new Date(open.due), "MMM d, yyyy")}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-muted-foreground">
+                      Priority
+                    </div>
+                    <Badge className="mt-1">{open.priority}</Badge>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">
+                      AI Score
+                    </div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Sparkles className="h-3 w-3 text-primary" />
+                      {open.aiScore}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Status
+                  </div>
+                  <Select
+                    value={open.status}
+                    onValueChange={async (v) => {
+                      await taskService.update(open.id, {
+                        status: v as Task["status"],
+                      });
+                      setStatus(open.id, v as Task["status"]);
+                      setOpen({ ...open, status: v as Task["status"] });
+                      toast.success("Status updated");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["todo", "in_progress", "review", "done"].map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p.replace("_", " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {open.tags.map((t) => (
+                    <Badge key={t} variant="outline">
+                      #{t}
+                    </Badge>
+                  ))}
+                </div>
+
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    await taskService.remove(open.id);
+                    toast.success("Task deleted");
+                    setOpen(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete task
+                </Button>
+
+                <div className="border-t border-border pt-3">
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Comments
+                  </div>
+                  <div className="rounded-lg bg-secondary/40 p-3 text-sm">
+                    "Looks good — let's ship it this week." — Noah
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </SheetContent>
       </Sheet>
 
@@ -387,6 +405,7 @@ function Tasks() {
           <DialogHeader>
             <DialogTitle>Create task</DialogTitle>
           </DialogHeader>
+
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -419,6 +438,7 @@ function Tasks() {
                 defaultValue="Follow up from Q4 strategy"
               />
             </div>
+
             <div className="space-y-1.5">
               <Label>Description</Label>
               <Textarea
@@ -427,6 +447,7 @@ function Tasks() {
                 defaultValue="Capture decisions, owners, and acceptance criteria."
               />
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Priority</Label>
@@ -443,6 +464,7 @@ function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1.5">
                 <Label>Status</Label>
                 <Select name="status" defaultValue="todo">
@@ -458,6 +480,7 @@ function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1.5">
                 <Label>Assignee</Label>
                 <Select name="assignee" defaultValue={teamUsers[0]?.id ?? "u2"}>
@@ -473,6 +496,7 @@ function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1.5">
                 <Label>Project</Label>
                 <Select name="project" defaultValue={projects[0]?.id}>
@@ -488,6 +512,7 @@ function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1.5">
                 <Label>Due</Label>
                 <Input
@@ -499,6 +524,7 @@ function Tasks() {
                     .slice(0, 10)}
                 />
               </div>
+
               <div className="space-y-1.5">
                 <Label>AI score</Label>
                 <Input
@@ -511,10 +537,12 @@ function Tasks() {
                 />
               </div>
             </div>
+
             <div className="space-y-1.5">
               <Label>Tags</Label>
               <Input name="tags" defaultValue="meeting, follow-up, ai" />
             </div>
+
             <DialogFooter>
               <Button
                 type="button"

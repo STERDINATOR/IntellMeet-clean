@@ -14,8 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useMeetingsStore } from "@/lib/stores";
-import { meetingService } from "@/lib/api/services";
-import { findUser } from "@/lib/mock";
+import { meetingService, userService } from "@/lib/api/services";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -27,6 +26,9 @@ function Meetings() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "upcoming" | "ended">("all");
+  const [teamUsers, setTeamUsers] = useState<
+    Array<{ id: string; name: string; avatar?: string; role?: string }>
+  >([]);
   const list = meetings.filter(
     (m) =>
       (filter === "all" || m.status === filter) &&
@@ -35,15 +37,56 @@ function Meetings() {
 
   useEffect(() => {
     meetingService.list().catch(() => toast.error("Unable to load meetings."));
+    userService
+      .list()
+      .then((data) => {
+        const normalized = (data as unknown[])
+          .map(
+            (u) =>
+              u as {
+                id?: string;
+                _id?: string;
+                name?: string;
+                avatar?: string;
+                role?: string;
+              },
+          )
+          .filter(
+            (u) =>
+              typeof u?.name === "string" &&
+              typeof (u.id ?? u._id) === "string",
+          )
+          .map((u) => ({
+            id: u.id ?? u._id!,
+            name: u.name!,
+            avatar: u.avatar,
+            role: u.role,
+          }));
+        setTeamUsers(normalized);
+      })
+      .catch(() => undefined);
   }, []);
 
+  const getUser = (id: string) =>
+    teamUsers.find((u) => u.id === id) ?? {
+      id,
+      name: "Unknown",
+      avatar: "",
+      role: "",
+    };
+
   const instant = async () => {
+    // Instant meetings must use real user + userIds.
+    // Backend expects host as ObjectId and participants as user ObjectIds.
     const result = await meetingService.create({
       title: "Instant Meeting",
       start: new Date().toISOString(),
       duration: 30,
       status: "live",
-      participants: ["me"],
+      // Backend schema expects user ObjectIds for participants.
+      // For MVP, we create the meeting with no extra participants.
+      // Host is derived server-side.
+      participants: [],
       host: "me",
       type: "Team",
     });
@@ -132,11 +175,11 @@ function Meetings() {
                 </div>
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex -space-x-2">
-                    {m.participants.slice(0, 4).map((id) => {
-                      const u = findUser(id);
+                    {m.participants.slice(0, 4).map((pid) => {
+                      const u = getUser(pid);
                       return (
                         <Avatar
-                          key={id}
+                          key={pid}
                           className="h-7 w-7 ring-2 ring-background"
                         >
                           <AvatarImage src={u.avatar} />

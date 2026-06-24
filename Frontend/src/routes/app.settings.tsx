@@ -29,7 +29,8 @@ function Settings() {
     setSavingProfile(true);
     const f = new FormData(e.currentTarget);
     try {
-      const updated = await apiClient.patch<any>("/users/me", {
+      type UserUpdatePayload = { name?: string; department?: string };
+      const updated = await apiClient.patch<UserUpdatePayload>("/users/me", {
         name: String(f.get("name")),
         department: String(f.get("department")),
       });

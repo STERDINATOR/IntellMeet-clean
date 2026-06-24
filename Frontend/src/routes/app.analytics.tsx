@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/ui-kit";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { analytics } from "@/lib/mock";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -40,15 +39,13 @@ function Analytics() {
       .catch(() => undefined);
   }, []);
 
-  const trends = liveData?.meetingTrends ?? analytics.meetingTrends;
-  const participation = liveData?.participation ?? analytics.participation;
-  const productivity = liveData?.productivity ?? analytics.productivity;
-  const effectiveness = liveData?.effectiveness ?? analytics.effectiveness;
-  const aiRecs = liveData?.aiRecommendations ?? [
-    "Move standups to async — save 4h/wk",
-    "Top performer this month: Sophia Kim",
-    "Friday meeting load is too high",
+  const trends = liveData?.meetingTrends ?? [];
+  const participation = liveData?.participation ?? [];
+  const productivity = liveData?.productivity ?? [];
+  const effectiveness = liveData?.effectiveness ?? [
+    { name: "Score", value: 0 },
   ];
+  const aiRecs = liveData?.aiRecommendations ?? [];
 
   return (
     <div>

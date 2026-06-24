@@ -16,9 +16,10 @@ function formatMonth(d: Date) {
 
 // Minimal MVP analytics endpoints (real DB-backed; UI wiring will consume these).
 analyticsRouter.get("/dashboard", async (req, res) => {
+  const userId = String((req.user as any)!._id);
   const [meetings, tasks, transcripts] = await Promise.all([
-    Meeting.find(workspace(req)).select("start status score duration").lean(),
-    Task.find(workspace(req)).select("status priority aiScore updatedAt").lean(),
+    Meeting.find(workspace(req)).select("start status score duration participants host").lean(),
+    Task.find({ ...workspace(req), assignee: userId }).select("status priority aiScore updatedAt").lean(),
     Transcript.find(workspace(req)).select("meetingId atSeconds speaker text").lean(),
   ]);
 
@@ -49,7 +50,7 @@ analyticsRouter.get("/dashboard", async (req, res) => {
     buckets[idx].focus += Number(m.duration ?? 0);
   }
 
-  // Productivity: last 7 days
+  // Productivity: last 7 days (user's completed tasks)
   const days = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -110,7 +111,11 @@ analyticsRouter.get("/dashboard", async (req, res) => {
 
 
 analyticsRouter.get("/recent-activity", async (req, res) => {
-  const logs = await AuditLog.find({ workspaceId: (req.user as any)!.workspaceId })
+  const userId = String((req.user as any)!._id);
+  const logs = await AuditLog.find({ 
+    workspaceId: (req.user as any)!.workspaceId,
+    actorUserId: userId 
+  })
     .sort({ createdAt: -1 })
     .limit(10)
     .populate<{ actorUserId: { _id: any; name: string; avatar?: string } }>("actorUserId", "name avatar")

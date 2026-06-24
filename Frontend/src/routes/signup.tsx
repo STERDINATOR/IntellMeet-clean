@@ -101,8 +101,17 @@ function Signup() {
     const form = new FormData(e.currentTarget);
     const name = `${form.get("firstName")} ${form.get("lastName")}`.trim();
     try {
+      type AuthUser = {
+        id?: string;
+        _id?: string;
+        name?: string;
+        role?: string;
+        email?: string;
+        avatar?: string;
+      };
+
       const session = await apiClient.post<{
-        user: any;
+        user: AuthUser;
         accessToken: string;
         refreshToken: string;
       }>("/auth/signup", {

@@ -25,28 +25,11 @@ import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
-export const Route = createFileRoute("/app/projects/$id")({
+export const Route = createFileRoute("/app_projects/$id")({
   component: ProjectDetail,
 });
 
 type TaskStatus = "todo" | "in_progress" | "review" | "done";
-
-type RemoteProject = {
-  id: string;
-  name: string;
-  description: string;
-  progress: number;
-  members: string[];
-};
-
-type ProjectTasksTask = {
-  id: string;
-  project: string;
-  assignee: string;
-  title: string;
-  priority: string;
-  status: TaskStatus;
-};
 
 const cols: { key: TaskStatus; label: string }[] = [
   { key: "todo", label: "To do" },
@@ -63,22 +46,13 @@ function ProjectDetail() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [memberId, setMemberId] = useState("");
-  const [remoteProject, setRemoteProject] = useState<RemoteProject | null>(
+  const [remoteProject, setRemoteProject] = useState<typeof project | null>(
     null,
   );
-  const [teamUsers, setTeamUsers] = useState<
-    Array<{
-      id: string;
-      name: string;
-      email?: string;
-      avatar?: string;
-      role?: string;
-      department?: string;
-      online?: boolean;
-    }>
-  >([]);
-
   const [loading, setLoading] = useState(false);
+  const [teamUsers, setTeamUsers] = useState<
+    Array<{ id: string; name: string; avatar?: string; role?: string }>
+  >([]);
 
   useEffect(() => {
     if (!project) {
@@ -86,9 +60,7 @@ function ProjectDetail() {
       projectService
         .get(id)
         .then((remote) => {
-          if (remote) {
-            setRemoteProject(remote as RemoteProject);
-          }
+          if (remote) setRemoteProject(remote);
         })
         .catch(() => toast.error("Unable to load project details."))
         .finally(() => setLoading(false));
@@ -117,11 +89,7 @@ function ProjectDetail() {
   if (!currentProject)
     return <div className="text-muted-foreground">Project not found.</div>;
 
-  const members = currentProject.members ?? [];
-
-  const projectTasks = (tasks as unknown as ProjectTasksTask[]).filter(
-    (t) => t.project === id,
-  );
+  const projectTasks = tasks.filter((t) => t.project === id);
 
   const getUser = (userId: string) =>
     teamUsers.find((u) => u.id === userId) ?? {
@@ -153,7 +121,7 @@ function ProjectDetail() {
 
           <div className="mt-4 flex items-center gap-3">
             <div className="flex -space-x-2">
-              {members.map((memberId) => {
+              {(currentProject.members ?? []).map((memberId) => {
                 const u = getUser(memberId);
                 return (
                   <Avatar
@@ -168,7 +136,7 @@ function ProjectDetail() {
             </div>
 
             <div className="text-sm text-muted-foreground">
-              {members.length} members
+              {(currentProject.members ?? []).length} members
             </div>
           </div>
         </Card>

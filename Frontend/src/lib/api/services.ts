@@ -5,7 +5,7 @@ import {
   useProjectsStore,
   useTasksStore,
 } from "@/lib/stores";
-import type { Meeting, Notification, Project, Task } from "@/lib/mock";
+import type { Meeting, Notification, Project, Task } from "@/lib/api/domain";
 
 const normalizeRemote = <T extends { _id?: string; id?: string }>(
   item: T,
@@ -19,201 +19,130 @@ const normalizeList = <T extends { _id?: string; id?: string }>(items: T[]) =>
 
 export const meetingService = {
   list: async (): Promise<Meeting[]> => {
-    try {
-      const meetings = normalizeList(
-        await apiClient.get<Meeting[]>("/meetings"),
-      ) as Meeting[];
-      useMeetingsStore.getState().setMeetings(meetings);
-      return meetings;
-    } catch {
-      return useMeetingsStore.getState().meetings;
-    }
+    const meetings = normalizeList(
+      await apiClient.get<Meeting[]>("/meetings"),
+    ) as Meeting[];
+    useMeetingsStore.getState().setMeetings(meetings);
+    return meetings;
   },
-  get: async (id: string): Promise<Meeting | undefined> => {
-    try {
-      return normalizeRemote(
-        await apiClient.get<Meeting>(`/meetings/${id}`),
-      ) as Meeting;
-    } catch {
-      return useMeetingsStore.getState().meetings.find((m) => m.id === id);
-    }
-  },
+
+  get: async (id: string): Promise<Meeting | undefined> =>
+    normalizeRemote(await apiClient.get<Meeting>(`/meetings/${id}`)) as Meeting,
+
   create: async (meeting: Omit<Meeting, "id">): Promise<Meeting> => {
-    try {
-      const created = normalizeRemote(
-        await apiClient.post<Meeting>("/meetings", meeting),
-      ) as Meeting;
-      useMeetingsStore
-        .getState()
-        .setMeetings([created, ...useMeetingsStore.getState().meetings]);
-      return created;
-    } catch {
-      const id = useMeetingsStore.getState().add(meeting);
-      return { ...meeting, id } as Meeting;
-    }
+    const created = normalizeRemote(
+      await apiClient.post<Meeting>("/meetings", meeting),
+    ) as Meeting;
+    useMeetingsStore
+      .getState()
+      .setMeetings([created, ...useMeetingsStore.getState().meetings]);
+    return created;
   },
+
   update: async (id: string, patch: Partial<Meeting>): Promise<void> => {
-    try {
-      await apiClient.patch<Meeting>(`/meetings/${id}`, patch);
-    } catch {
-      // no-op: UI state still updated below
-    }
+    await apiClient.patch<Meeting>(`/meetings/${id}`, patch);
     useMeetingsStore.getState().update(id, patch);
   },
+
   remove: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete<void>(`/meetings/${id}`);
-    } catch {
-      // no-op
-    }
+    await apiClient.delete<void>(`/meetings/${id}`);
     useMeetingsStore.getState().remove(id);
   },
 };
 
 export const taskService = {
   list: async (): Promise<Task[]> => {
-    try {
-      const tasks = normalizeList(
-        await apiClient.get<Task[]>("/tasks"),
-      ) as Task[];
-      useTasksStore.getState().setTasks(tasks);
-      return tasks;
-    } catch {
-      return useTasksStore.getState().tasks;
-    }
+    const tasks = normalizeList(
+      await apiClient.get<Task[]>("/tasks"),
+    ) as Task[];
+    useTasksStore.getState().setTasks(tasks);
+    return tasks;
   },
-  get: async (id: string): Promise<Task | undefined> => {
-    try {
-      return normalizeRemote(await apiClient.get<Task>(`/tasks/${id}`)) as Task;
-    } catch {
-      return useTasksStore.getState().tasks.find((t) => t.id === id);
-    }
-  },
+
+  get: async (id: string): Promise<Task | undefined> =>
+    normalizeRemote(await apiClient.get<Task>(`/tasks/${id}`)) as Task,
+
   create: async (task: Omit<Task, "id">): Promise<Task> => {
-    try {
-      const created = normalizeRemote(
-        await apiClient.post<Task>("/tasks", task),
-      ) as Task;
-      useTasksStore
-        .getState()
-        .setTasks([created, ...useTasksStore.getState().tasks]);
-      return created;
-    } catch {
-      const id = useTasksStore.getState().add(task);
-      return { ...task, id } as Task;
-    }
+    const created = normalizeRemote(
+      await apiClient.post<Task>("/tasks", task),
+    ) as Task;
+    useTasksStore
+      .getState()
+      .setTasks([created, ...useTasksStore.getState().tasks]);
+    return created;
   },
+
   update: async (id: string, patch: Partial<Task>): Promise<void> => {
-    try {
-      await apiClient.patch<Task>(`/tasks/${id}`, patch);
-    } catch {
-      // no-op
-    }
+    await apiClient.patch<Task>(`/tasks/${id}`, patch);
     useTasksStore.getState().update(id, patch);
   },
+
   remove: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete<void>(`/tasks/${id}`);
-    } catch {
-      // no-op
-    }
+    await apiClient.delete<void>(`/tasks/${id}`);
     useTasksStore.getState().remove(id);
   },
 };
 
 export const projectService = {
   list: async (): Promise<Project[]> => {
-    try {
-      const projects = normalizeList(
-        await apiClient.get<Project[]>("/projects"),
-      ) as Project[];
-      useProjectsStore.getState().setProjects(projects);
-      return projects;
-    } catch {
-      return useProjectsStore.getState().projects;
-    }
+    const projects = normalizeList(
+      await apiClient.get<Project[]>("/projects"),
+    ) as Project[];
+    useProjectsStore.getState().setProjects(projects);
+    return projects;
   },
-  get: async (id: string): Promise<Project | undefined> => {
-    try {
-      return normalizeRemote(
-        await apiClient.get<Project>(`/projects/${id}`),
-      ) as Project;
-    } catch {
-      return useProjectsStore.getState().projects.find((p) => p.id === id);
-    }
-  },
+
+  get: async (id: string): Promise<Project | undefined> =>
+    normalizeRemote(await apiClient.get<Project>(`/projects/${id}`)) as Project,
+
   create: async (project: Omit<Project, "id">): Promise<Project> => {
-    try {
-      const created = normalizeRemote(
-        await apiClient.post<Project>("/projects", project),
-      ) as Project;
-      useProjectsStore
-        .getState()
-        .setProjects([created, ...useProjectsStore.getState().projects]);
-      return created;
-    } catch {
-      const id = useProjectsStore.getState().add(project);
-      return { ...project, id } as Project;
-    }
+    const created = normalizeRemote(
+      await apiClient.post<Project>("/projects", project),
+    ) as Project;
+    useProjectsStore
+      .getState()
+      .setProjects([created, ...useProjectsStore.getState().projects]);
+    return created;
   },
+
   update: async (id: string, patch: Partial<Project>): Promise<void> => {
-    try {
-      await apiClient.patch<Project>(`/projects/${id}`, patch);
-    } catch {
-      // no-op
-    }
+    await apiClient.patch<Project>(`/projects/${id}`, patch);
     useProjectsStore.getState().update(id, patch);
   },
 };
 
 export const notificationService = {
   list: async (): Promise<Notification[]> => {
-    try {
-      const items = normalizeList(
-        await apiClient.get<Notification[]>("/notifications"),
-      ) as Notification[];
-      useNotificationsStore.getState().setNotifications(items);
-      return items;
-    } catch {
-      return useNotificationsStore.getState().items;
-    }
+    const items = normalizeList(
+      await apiClient.get<Notification[]>("/notifications"),
+    ) as Notification[];
+    useNotificationsStore.getState().setNotifications(items);
+    return items;
   },
+
   create: async (
     notification: Omit<Notification, "id" | "time" | "read">,
   ): Promise<void> => {
-    try {
-      const created = normalizeRemote(
-        await apiClient.post<Notification>("/notifications", notification),
-      ) as Notification;
-      useNotificationsStore
-        .getState()
-        .setNotifications([created, ...useNotificationsStore.getState().items]);
-    } catch {
-      useNotificationsStore.getState().add(notification);
-    }
+    const created = normalizeRemote(
+      await apiClient.post<Notification>("/notifications", notification),
+    ) as Notification;
+    useNotificationsStore
+      .getState()
+      .setNotifications([created, ...useNotificationsStore.getState().items]);
   },
+
   markAllRead: async (): Promise<void> => {
-    try {
-      await apiClient.post<void>("/notifications/read-all");
-    } catch {
-      // no-op
-    }
+    await apiClient.post<void>("/notifications/read-all");
     useNotificationsStore.getState().markAllRead();
   },
+
   markRead: async (id: string): Promise<void> => {
-    try {
-      await apiClient.post<Notification>(`/notifications/${id}/read`);
-    } catch {
-      // no-op
-    }
+    await apiClient.post<Notification>(`/notifications/${id}/read`);
     useNotificationsStore.getState().markRead(id);
   },
+
   remove: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete<void>(`/notifications/${id}`);
-    } catch {
-      // no-op
-    }
+    await apiClient.delete<void>(`/notifications/${id}`);
     useNotificationsStore.getState().remove(id);
   },
 };
@@ -241,6 +170,7 @@ export const transcriptService = {
         atSeconds: number;
       }>
     >(`/meetings/${meetingId}/transcripts`),
+
   create: (
     meetingId: string,
     transcript: { speaker: string; text: string; atSeconds: number },
@@ -259,6 +189,7 @@ export const analyticsService = {
         time: string;
       }>
     >("/analytics/recent-activity"),
+
   dashboard: () =>
     apiClient.get<{
       meetingTrends: Array<{ month: string; meetings: number; focus: number }>;
@@ -267,6 +198,7 @@ export const analyticsService = {
       participation: Array<{ name: string; value: number }>;
       aiRecommendations: string[];
     }>("/analytics/dashboard"),
+
   exportCsv: async (): Promise<void> => {
     const token = tokenManager.getAccessToken();
     const res = await fetch(`${API_BASE_URL}/analytics/export`, {
