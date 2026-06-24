@@ -2,12 +2,25 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Bell, Search, Moon, Sun, LogOut, Plus, Command } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore, useNotificationsStore, useUIStore } from "@/lib/stores";
 import { apiClient } from "@/lib/api/client";
+import { notificationService } from "@/lib/api/services";
 import { formatDistanceToNow } from "date-fns";
+import { useEffect } from "react";
 
 export function Topbar() {
   const { theme, setTheme, setCommandOpen } = useUIStore();
@@ -16,6 +29,10 @@ export function Topbar() {
   const logout = useAuthStore((s) => s.logout);
   const unread = items.filter((n) => !n.read).length;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    notificationService.list().catch(() => undefined);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -41,39 +58,74 @@ export function Topbar() {
         </kbd>
       </div>
 
-      <Button size="sm" className="gradient-primary text-primary-foreground border-0 glow hidden sm:inline-flex" onClick={() => navigate({ to: "/app/meetings/new" })}>
+      <Button
+        size="sm"
+        className="gradient-primary text-primary-foreground border-0 glow hidden sm:inline-flex"
+        onClick={() => navigate({ to: "/app/meetings/new" })}
+      >
         <Plus className="h-4 w-4 mr-1" /> New Meeting
       </Button>
 
-      <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">
-        {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        aria-label="Toggle theme"
+      >
+        {theme === "dark" ? (
+          <Sun className="h-4 w-4" />
+        ) : (
+          <Moon className="h-4 w-4" />
+        )}
       </Button>
 
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-4 w-4" />
-            {unread > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary glow" />}
+            {unread > 0 && (
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary glow" />
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-96 p-0">
           <div className="flex items-center justify-between p-3 border-b border-border">
             <div className="font-semibold text-sm">Notifications</div>
-            <button onClick={markAllRead} className="text-xs text-primary hover:underline">Mark all read</button>
+            <button
+              onClick={markAllRead}
+              className="text-xs text-primary hover:underline"
+            >
+              Mark all read
+            </button>
           </div>
           <div className="max-h-96 overflow-y-auto">
-            {items.slice(0,8).map((n) => (
-              <button key={n.id} onClick={() => markRead(n.id)} className={`w-full text-left flex gap-3 p-3 border-b border-border/40 hover:bg-secondary/60 ${!n.read ? "bg-primary/5" : ""}`}>
-                <div className={`mt-1 h-2 w-2 rounded-full ${!n.read ? "bg-primary" : "bg-muted-foreground/40"}`} />
+            {items.slice(0, 8).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => markRead(n.id)}
+                className={`w-full text-left flex gap-3 p-3 border-b border-border/40 hover:bg-secondary/60 ${!n.read ? "bg-primary/5" : ""}`}
+              >
+                <div
+                  className={`mt-1 h-2 w-2 rounded-full ${!n.read ? "bg-primary" : "bg-muted-foreground/40"}`}
+                />
                 <div className="flex-1">
                   <div className="text-sm font-medium">{n.title}</div>
-                  <div className="text-xs text-muted-foreground line-clamp-1">{n.body}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">{formatDistanceToNow(new Date(n.time), { addSuffix: true })}</div>
+                  <div className="text-xs text-muted-foreground line-clamp-1">
+                    {n.body}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    {formatDistanceToNow(new Date(n.time), { addSuffix: true })}
+                  </div>
                 </div>
               </button>
             ))}
           </div>
-          <Link to="/app/notifications" className="block text-center text-xs p-3 text-primary hover:underline border-t border-border">View all</Link>
+          <Link
+            to="/app/notifications"
+            className="block text-center text-xs p-3 text-primary hover:underline border-t border-border"
+          >
+            View all
+          </Link>
         </PopoverContent>
       </Popover>
 
@@ -92,8 +144,12 @@ export function Topbar() {
             <div className="text-xs text-muted-foreground">{user.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate({ to: "/app/profile" })}>Profile</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate({ to: "/app/settings" })}>Settings</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/app/profile" })}>
+            Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/app/settings" })}>
+            Settings
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" /> Log out

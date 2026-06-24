@@ -32,7 +32,11 @@ async function refreshTokens(): Promise<boolean> {
     });
 
     if (!response.ok) return false;
-    const payload = await response.json() as { accessToken?: string; refreshToken?: string; user?: unknown };
+    const payload = (await response.json()) as {
+      accessToken?: string;
+      refreshToken?: string;
+      user?: unknown;
+    };
     if (!payload.accessToken) return false;
 
     useAuthStore.getState().setSession({
@@ -49,7 +53,10 @@ async function refreshTokens(): Promise<boolean> {
 async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const retry = options.retry ?? 1;
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", headers.get("Content-Type") ?? "application/json");
+  headers.set(
+    "Content-Type",
+    headers.get("Content-Type") ?? "application/json",
+  );
   const token = tokenManager.getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -63,13 +70,30 @@ async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
   }
 
   let payload: unknown;
-  try { payload = await res.json(); } catch {}
+  try {
+    payload = await res.json();
+  } catch (e) {
+    // Ignore JSON parse failures; response may be empty/non-JSON.
+    payload = undefined;
+  }
   throw new ApiError(`Request failed: ${res.status}`, res.status, payload);
 }
 
 export const apiClient = {
-  get: <T>(path: string, options?: ApiOptions) => request<T>(path, { ...options, method: "GET" }),
-  post: <T>(path: string, body?: unknown, options?: ApiOptions) => request<T>(path, { ...options, method: "POST", body: body ? JSON.stringify(body) : undefined }),
-  patch: <T>(path: string, body?: unknown, options?: ApiOptions) => request<T>(path, { ...options, method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
-  delete: <T>(path: string, options?: ApiOptions) => request<T>(path, { ...options, method: "DELETE" }),
+  get: <T>(path: string, options?: ApiOptions) =>
+    request<T>(path, { ...options, method: "GET" }),
+  post: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+    request<T>(path, {
+      ...options,
+      method: "POST",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  patch: <T>(path: string, body?: unknown, options?: ApiOptions) =>
+    request<T>(path, {
+      ...options,
+      method: "PATCH",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  delete: <T>(path: string, options?: ApiOptions) =>
+    request<T>(path, { ...options, method: "DELETE" }),
 };

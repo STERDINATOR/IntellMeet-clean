@@ -7,15 +7,13 @@ import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { useAuthStore, useUIStore } from "@/lib/stores";
 import { apiClient, tokenManager } from "@/lib/api/client";
+import { connectRealtime, startGlobalRealtimeSync } from "@/lib/realtime";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
   beforeLoad: () => {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("im-auth");
-      const authed = raw ? JSON.parse(raw)?.state?.isAuthed : false;
-      if (!authed) throw redirect({ to: "/login" });
-    }
+    const authed = useAuthStore.getState().isAuthed;
+    if (!authed) throw redirect({ to: "/login" });
   },
 });
 
@@ -34,7 +32,16 @@ function AppLayout() {
 
     const loadMe = async () => {
       try {
-        const response = await apiClient.get<{ user: any }>("/auth/me");
+        type AuthUser = {
+          id?: string;
+          _id?: string;
+          name?: string;
+          role?: string;
+          email?: string;
+          avatar?: string;
+        };
+
+        const response = await apiClient.get<{ user?: AuthUser }>("/auth/me");
         if (response?.user) {
           setSession({
             user: response.user,
@@ -48,6 +55,8 @@ function AppLayout() {
     };
 
     loadMe();
+    connectRealtime();
+    startGlobalRealtimeSync();
   }, [isAuthed, setSession]);
 
   return (

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../auth.js";
-import { AIInsights, Meeting, Task, Transcript, User } from "../models.js";
+import { AIInsights, Meeting, Task, Transcript, User, AuditLog } from "../models.js";
 
 
 export const analyticsRouter = Router();
@@ -16,9 +16,10 @@ function formatMonth(d: Date) {
 
 // Minimal MVP analytics endpoints (real DB-backed; UI wiring will consume these).
 analyticsRouter.get("/dashboard", async (req, res) => {
+  const userId = String((req.user as any)!._id);
   const [meetings, tasks, transcripts] = await Promise.all([
-    Meeting.find(workspace(req)).select("start status score duration").lean(),
-    Task.find(workspace(req)).select("status priority aiScore updatedAt").lean(),
+    Meeting.find(workspace(req)).select("start status score duration participants host").lean(),
+    Task.find({ ...workspace(req), assignee: userId }).select("status priority aiScore updatedAt").lean(),
     Transcript.find(workspace(req)).select("meetingId atSeconds speaker text").lean(),
   ]);
 
@@ -32,12 +33,6 @@ analyticsRouter.get("/dashboard", async (req, res) => {
 
   const monthKey = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1).getTime();
   const bucketKeyToIndex = new Map<number, number>();
-  buckets.forEach((b, idx) => {
-    // reconstruct key from month name is ambiguous; compute by iterating same range
-    // instead compute keys directly here:
-    // (recreate once per idx)
-    // eslint-disable-next-line no-new-wrappers
-  });
 
   // Compute range keys deterministically
   const rangeKeys: number[] = [];
@@ -55,7 +50,7 @@ analyticsRouter.get("/dashboard", async (req, res) => {
     buckets[idx].focus += Number(m.duration ?? 0);
   }
 
-  // Productivity: last 7 days
+  // Productivity: last 7 days (user's completed tasks)
   const days = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -107,7 +102,6 @@ analyticsRouter.get("/dashboard", async (req, res) => {
     // AI recommendations from persisted AIInsights (workspace-scoped)
     aiRecommendations: (await AIInsights.find({
       workspaceId: (req.user as any)!.workspaceId,
-      scopeType: "workspace",
     })
       .sort({ createdAt: -1 })
       .limit(3)
@@ -115,6 +109,29 @@ analyticsRouter.get("/dashboard", async (req, res) => {
   });
 });
 
+
+analyticsRouter.get("/recent-activity", async (req, res) => {
+  const userId = String((req.user as any)!._id);
+  const logs = await AuditLog.find({ 
+    workspaceId: (req.user as any)!.workspaceId,
+    actorUserId: userId 
+  })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .populate<{ actorUserId: { _id: any; name: string; avatar?: string } }>("actorUserId", "name avatar")
+    .lean();
+
+  res.json(
+    logs.map((l: any) => ({
+      id: String(l._id),
+      actor: { id: String(l.actorUserId?._id ?? ""), name: l.actorUserId?.name ?? "System", avatar: l.actorUserId?.avatar },
+      eventType: l.eventType,
+      resourceType: l.resourceType,
+      resourceId: l.resourceId,
+      time: l.createdAt,
+    }))
+  );
+});
 
 analyticsRouter.get("/export", async (req, res) => {
   // Simple CSV export for the UI button in app.analytics.tsx.
